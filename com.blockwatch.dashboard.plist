@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.blockwatch.dashboard</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/env</string>
+    <string>node</string>
+    <string>/Users/YOUR_USERNAME/blockwatch/server.js</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/YOUR_USERNAME/blockwatch</string>
+
+  <!-- Uncomment if not using cookie auth -->
+  <!--
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>BITCOIN_RPC_USER</key>
+    <string>yourusername</string>
+    <key>BITCOIN_RPC_PASS</key>
+    <string>yourpassword</string>
+  </dict>
+  -->
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/blockwatch.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/tmp/blockwatch.error.log</string>
+</dict>
+</plist>

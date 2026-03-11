@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+  <link rel="icon" type="image/x-icon" href="data:image/x-icon;base64,AAABAAIAEBAAAAAAIABWAAAAJgAAACAgAAAAACAAbAAAAHwAAACJUE5HDQoaCgAAAA1JSERSAAAAEAAAABAIBgAAAB/z/2EAAAAdSURBVHicY/xQoPCfgQLARInmUQNGDRg1YDAZAABjagKfgnpoPAAAAABJRU5ErkJggolQTkcNChoKAAAADUlIRFIAAAAgAAAAIAgGAAAAc3p69AAAADNJREFUeJztzkEBADAIxLBjSiZx0nEwZPBJDTTV7/4sdjbnAAAAAAAAAAAAAAAAAAAASTJQSgK/ax4pmQAAAABJRU5ErkJggg==">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex,nofollow">
+<meta name="description" content="blockwatch — real-time Bitcoin node dashboard">
+<meta name="theme-color" content="#0e0e0e">
+<title>blockwatch</title>
+<!-- JetBrains Mono: load from Google Fonts (swap for self-hosted woff2 to remove external dependency) -->
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="blockwatch.css">
+</head>
+<noscript><style>body{display:flex;align-items:center;justify-content:center;height:100vh;background:#080808;color:#686868;font-family:monospace;font-size:12px}</style><div style="text-align:center">blockwatch requires javascript</div></noscript>
+<body>
+<div id="app">
+
+<!-- TITLEBAR -->
+<div id="titlebar">
+  <div class="tl">
+    <span class="tb-logo"><b></b>&nbsp;blockwatch</span>
+    <span class="tb-sep">│</span>
+    <span class="tb-ver-badge" id="tb-ver">—</span>
+    <span class="tb-sep">·</span>
+    <span class="tb-dim" id="tb-uptime" style="display:none"></span>
+    <span class="tb-sep" id="tb-uptime-sep" style="display:none">·</span>
+    <span id="tb-ibd-label" class="tb-warn" style="display:none">IBD</span>
+    <span class="tb-sync-badge" id="tb-sync" style="display:none"></span>
+  </div>
+  <div class="tr">
+    <span class="tb-height-main" id="tb-height">—</span>
+    <span class="tb-sep">·</span>
+    <span class="tb-dim" id="clock">—</span><span class="tb-dim" style="margin-left:3px;color:var(--t4);font-size:9px">UTC</span>
+    <span class="tb-sep">·</span>
+    <button id="snapshot-btn" class="ph-tsv-btn snapshot-btn">snapshot ↓</button>
+    <span class="dot" id="live-dot"></span>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+
+  <!-- COL 1: NODE -->
+  <div class="col-wrap resizable" id="col1">
+    <div class="panel" data-panel="node">
+      <div class="ph"><span class="ph-drag">⠿</span><span class="ph-title">node</span><span class="ph-sep">|</span><span class="ph-meta" id="ni-net">—</span><button class="ph-close">×</button></div>
+      <div class="pb">
+
+        <div class="sec">chain</div>
+        <div class="kv"><span class="k">height</span><span class="v" id="ni-h">—</span></div>
+        <div class="kv" id="ni-hd-row"><span class="k">headers</span><span class="v dim" id="ni-hd">—</span></div>
+        <div class="kv"><span class="k">sync</span><span class="v o" id="ni-sync">—</span></div>
+        <div class="kv"><span class="k">tip age</span><span class="v" id="ni-ta">—</span></div>
+        <div class="kv"><span class="k">median time</span><span class="v dim" id="ni-mt">—</span></div>
+        <div class="kv"><span class="k">chain tips</span><span class="v" id="ni-tips">—</span></div>
+        <div id="ibd-section" style="display:none">
+          <div class="kv"><span class="k">IBD</span><span class="v" id="ni-ibd">—</span></div>
+          <div class="ibd-track"><div class="ibd-fill" id="ibd-fill" style="width:0%"></div></div>
+          <div class="ibd-eta" id="ibd-eta">—</div>
+        </div>
+
+        <div class="sec">mempool</div>
+        <div id="mp-loading-row" style="display:none"><div class="kv"><span class="k">loaded</span><span class="v" id="mp-loaded">—</span></div></div>
+        <div class="kv"><span class="k">txs · size</span><span class="v v-pair"><span id="mp-txs">—</span><span class="v-pair-sep">·</span><span class="dim" id="mp-sz">—</span></span></div>
+        <div class="kv"><span class="k">usage</span><span class="v dim" id="mp-us">—</span></div>
+        <div class="kv"><span class="k">min fee · total</span><span class="v v-pair"><span class="o" id="mp-mf">—</span><span class="v-pair-sep">·</span><span class="dim" id="mp-tf">—</span></span></div>
+        <div class="kv" id="mp-relay-fee-row"><span class="k">relay · incr. fee</span><span class="v v-pair"><span class="dim" id="mp-rf">—</span><span class="v-pair-sep">·</span><span class="dim" id="mp-incrf">—</span></span></div>
+        <div class="kv"><span class="k">unbroadcast</span><span class="v" id="mp-unconf">—</span></div>
+
+        <div class="sec">network</div>
+        <div class="kv"><span class="k">connections</span><span class="v v-pair"><span class="dim" id="ni-conn">—</span><span class="v-pair-sep">·</span><span class="dim" id="ni-conn-split">—</span></span></div>
+        <div class="kv"><span class="k">relay fee</span><span class="v dim" id="ni-rf">—</span></div>
+        <div id="ni-reachability"><span style="font-size:9px;color:var(--t4);padding:2px 0;display:block">—</span></div>
+
+        <div class="sec">config</div>
+        <div class="kv"><span class="k">chain size</span><span class="v v-pair"><span id="ni-sz">—</span><span class="v-pair-sep">·</span><span class="dim" id="ni-pr">—</span></span></div>
+        <div class="kv" id="ni-pruneheight-row" style="display:none"><span class="k">prune height</span><span class="v dim" id="ni-pruneheight">—</span></div>
+        <div class="kv"><span class="k">full rbf</span><span class="v dim" id="mp-fullrbf">—</span></div>
+        <div class="kv"><span class="k dim">protocol</span><span class="v dim" id="ni-pv">—</span></div>
+        <div class="kv"><span class="k dim">rpc</span><span class="v mono" id="ni-rpc">—</span></div>
+
+        <div class="sec" style="display:flex;align-items:center;justify-content:space-between;gap:6px">
+          <span>reachable addresses</span>
+          <button class="la-toggle" id="la-reveal-btn">reveal</button>
+        </div>
+        <div id="ni-localaddrs"><span style="font-size:9px;color:var(--t4);padding:2px 0;display:block">—</span></div>
+      </div>
+    </div>
+    <div class="rhandle" data-target="col1"></div>
+  </div>
+
+  <!-- COL 2: CHAIN + FEES -->
+  <div class="col-wrap resizable" id="col2">
+    <div class="panel" id="p-col2-top" data-panel="chain">
+      <div class="ph"><span class="ph-drag">⠿</span><span class="ph-title">chain</span><span class="ph-sep">|</span><span class="ph-meta" id="ch-tip-age">—</span><button class="ph-close">×</button></div>
+      <div class="pb">
+        <div class="sec">bandwidth</div>
+        <div class="bw-group">
+          <div class="bw-item">
+            <div class="bw-lbl">▲ sent</div>
+            <div class="mtrack"><div class="mfill o2" id="bw-up-fill" style="width:0%"></div></div>
+            <div class="bw-val" id="bw-up-v">—</div>
+          </div>
+          <div class="bw-item">
+            <div class="bw-lbl">▼ recv</div>
+            <div class="mtrack"><div class="mfill o" id="bw-dn-fill" style="width:0%"></div></div>
+            <div class="bw-val" id="bw-dn-v">—</div>
+          </div>
+        </div>
+        <canvas id="spark" height="48" style="width:100%;margin-bottom:3px"></canvas>
+        <div style="display:flex;justify-content:flex-end;gap:10px;margin-bottom:4px">
+          <span style="font-size:7.5px;color:rgba(240,112,32,.7);display:flex;align-items:center;gap:3px"><span style="display:inline-block;width:10px;height:1.5px;background:rgba(240,112,32,.8);border-radius:1px;vertical-align:middle"></span>recv</span>
+          <span style="font-size:7.5px;color:rgba(196,137,74,.7);display:flex;align-items:center;gap:3px"><span style="display:inline-block;width:10px;height:1.5px;background:rgba(196,137,74,.75);border-radius:1px;vertical-align:middle"></span>sent</span>
+        </div>
+        <div class="kv"><span class="k">recv total</span><span class="v dim" id="bw-rv">—</span></div>
+        <div class="kv"><span class="k">sent total</span><span class="v dim" id="bw-sn">—</span></div>
+
+        <div class="sec">fee estimates (sat/vB)</div>
+        <div id="fee-rows"></div>
+
+      </div>
+    </div>
+    <div class="panel" id="p-col2-heatmap" data-panel="fee-heatmap">
+      <div class="ph"><span class="ph-drag">⠿</span><span class="ph-title">fee heatmap</span><span class="ph-sep">|</span><span class="ph-meta" id="fh-ph">last 12 blocks</span><button class="ph-close">×</button></div>
+      <div class="pb" style="padding:6px 13px 8px 6px">
+        <div id="fee-heatmap-wrap"></div>
+        <div style="display:flex;align-items:center;gap:5px;margin-top:4px;justify-content:flex-end">
+          <span style="font-size:7.5px;color:var(--t4)">sparse</span>
+          <div style="width:44px;height:3px;border-radius:1px;background:linear-gradient(to right,rgba(var(--orange-rgb,240,112,32),.06),rgba(var(--orange-rgb,240,112,32),.85))"></div>
+          <span style="font-size:7.5px;color:var(--orange)">dense</span>
+        </div>
+      </div>
+    </div>
+    <div class="panel" id="p-col2-subsidy" data-panel="fee-subsidy">
+      <div class="ph"><span class="ph-drag">⠿</span><span class="ph-title">fee / subsidy</span><span class="ph-sep">|</span><span class="ph-meta" id="fs-ph">mining revenue mix</span><button class="ph-close">×</button></div>
+      <div class="pb" style="padding:6px 13px 8px">
+        <canvas id="fs-canvas" style="width:100%;display:block"></canvas>
+        <div class="chart-leg">
+          <span class="chart-leg-min" id="fs-min">—</span>
+          <span class="chart-leg-avg" id="fs-avg">avg —</span>
+          <span class="chart-leg-max" id="fs-max">—</span>
+        </div>
+      </div>
+    </div>
+    <div class="panel" id="p-col2-mid" data-panel="block-timing">
+      <div class="ph"><span class="ph-drag">⠿</span><span class="ph-title">block timing</span><span class="ph-sep">|</span><span class="ph-meta" id="bt-ph">last 12</span><button class="ph-close">×</button></div>
+      <div class="pb" style="padding:6px 13px 8px">
+        <canvas id="bt-canvas" style="width:100%;display:block"></canvas>
+        <div class="chart-leg">
+          <span class="chart-leg-min" id="bt-min">—</span>
+          <span class="chart-leg-avg" id="bt-avg">avg —</span>
+          <span class="chart-leg-max" id="bt-max">—</span>
+        </div>
+      </div>
+    </div>
+    <div class="rhandle" data-target="col2"></div>
+  </div>
+
+  <!-- COL 3: BLOCKS + MEMPOOL -->
+  <div class="col-wrap resizable" id="col3">
+    <div class="panel" id="p-col3-top" data-panel="blocks">
+      <div class="ph"><span class="ph-drag">⠿</span><span class="ph-title">blocks</span><span class="ph-sep">|</span><span class="ph-meta" id="blk-ph">—</span><button class="ph-close">×</button></div>
+      <div class="scroll-area">
+        <table class="tbl">
+          <thead><tr><th>#</th><th>hash</th><th>txs</th><th>in/out</th><th>fill</th><th>age</th></tr></thead>
+          <tbody id="blk-body"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="panel" id="p-col3-mid" data-panel="block-detail">
+      <div class="ph"><span class="ph-drag">⠿</span><span class="ph-title">block</span><span class="ph-sep">|</span><span class="ph-meta" id="bd-ph">latest</span><button class="ph-close">×</button></div>
+      <div class="pb" id="block-detail-body">
+        <div class="kv"><span class="k">height</span><span class="v dim">—</span></div>
+        <div class="kv"><span class="k">hash</span><span class="v dim">—</span></div>
+        <div class="kv"><span class="k">age · txs</span><span class="v dim">—</span></div>
+        <div class="kv"><span class="k">in · out</span><span class="v dim">—</span></div>
+        <div class="kv"><span class="k">size · fill</span><span class="v dim">—</span></div>
+        <div class="kv"><span class="k">avg · total fee</span><span class="v dim">—</span></div>
+        <div class="kv"><span class="k">subsidy · era</span><span class="v dim">—</span></div>
+        <div class="kv"><span class="k">fee share</span><span class="v dim">—</span></div>
+        <div class="kv"><span class="k">signalling</span><span class="v dim">—</span></div>
+        <div class="kv"><span class="k">version · bits</span><span class="v dim">—</span></div>
+        <div class="kv"><span class="k">median time</span><span class="v dim">—</span></div>
+      </div>
+    </div>
+    <div class="panel" id="p-col3-bot" data-panel="mining">
+      <div class="ph"><span class="ph-drag">⠿</span><span class="ph-title">mining</span><span class="ph-sep">|</span><span class="ph-meta" id="mn-ph">—</span><button class="ph-close">×</button></div>
+      <div class="pb">
+        <div class="kv"><span class="k">diff · hashrate</span><span class="v v-pair"><span class="dim" id="mn-df">—</span><span class="v-pair-sep">·</span><span class="o" id="mn-hr">—</span></span></div>
+        <div class="kv"><span class="k dim">chainwork</span><span class="v mono v-copyable"><span id="mn-cw">—</span><span id="mn-cw-copy" data-copy="" class="copy-icon">⎘</span></span></div>
+        <div class="kv"><span class="k">tx/s (2w) · total</span><span class="v v-pair"><span class="dim" id="mn-tps">—</span><span class="v-pair-sep">·</span><span class="dim" id="mn-ttx">—</span></span></div>
+        <div class="sec">retarget</div>
+        <div class="kv"><span class="k">block · left</span><span class="v v-pair"><span id="mn-rt-blk">—</span><span class="v-pair-sep">·</span><span class="dim" id="mn-rt-left">—</span></span></div>
+        <div class="kv"><span class="k">est. date</span><span class="v dim" id="mn-rt-date">—</span></div>
+        <div class="kv"><span class="k">adj · avg</span><span class="v v-pair"><span id="mn-rt-chg">—</span><span class="v-pair-sep">·</span><span class="dim" id="mn-rt-avg">—</span></span></div>
+      </div>
+    </div>
+    <div class="rhandle" data-target="col3"></div>
+  </div>
+
+  <!-- COL 4: PEERS + SERVICES + BANNED + DETAIL -->
+  <div class="col-wrap" id="col4">
+    <div class="panel" id="p-col4-top" data-panel="peers">
+      <div class="ph"><span class="ph-drag">⠿</span><span class="ph-title">peers</span><span class="ph-sep">|</span><span class="ph-meta" id="peer-in-ph" style="flex:0 0 auto">—</span><span style="color:var(--t4);margin:0 4px;flex-shrink:0">·</span><span class="ph-meta" style="flex:0 0 auto" id="peer-out-ph">—</span><span class="ph-right"><button id="peers-tsv-btn" class="ph-tsv-btn">peers ↓</button><button class="ph-close">×</button></span></div>
+      <div class="scroll-area">
+        <table class="tbl" id="peer-tbl">
+          <thead><tr><th></th><th>address</th><th>net</th><th>version</th><th style="text-align:right">blks</th><th style="text-align:right">ping</th><th style="text-align:right">↑</th><th style="text-align:right">↓</th></tr></thead>
+          <tbody id="peer-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="panel" id="p-col4-mid" data-panel="banned">
+      <div class="ph"><span class="ph-drag">⠿</span><span class="ph-title">banned</span><span class="ph-sep">|</span><span class="ph-meta" id="ban-ph">—</span><button class="ph-close">×</button></div>
+      <div class="scroll-area pb" id="ban-rows">
+        <div class="ban-empty">no bans</div>
+      </div>
+    </div>
+    <div class="panel" id="p-col4-svc" data-panel="services">
+      <div class="ph"><span class="ph-drag">⠿</span><span class="ph-title">services</span><span class="ph-sep">|</span><span class="ph-meta" id="svc-ph">—</span><button class="ph-close">×</button></div>
+      <div class="pb">
+        <div class="svc-grid" id="svc-grid"></div>
+      </div>
+    </div>
+    <div class="panel" id="p-col4-bot" data-panel="peer-detail">
+      <div class="ph"><span class="ph-drag">⠿</span><span class="ph-title">peer detail</span><span class="ph-sep">|</span><span class="ph-meta" id="pd-ph">—</span><button class="ph-close">×</button></div>
+      <div class="pd-tabs" id="pd-tabs">
+        <button class="pd-tab active" data-tab="conn">conn</button>
+        <button class="pd-tab" data-tab="sync">sync</button>
+        <button class="pd-tab" data-tab="bw">bw</button>
+        <button class="pd-tab" data-tab="gossip">gossip</button>
+      </div>
+      <div class="pb" id="peer-detail-body">
+        <div class="pd-empty">click a peer to inspect</div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- #main -->
+
+<!-- CONNECTING -->
+<div id="connecting">
+  <div class="c-spin"></div>
+  <span class="c-logo"><b></b>&nbsp;blockwatch</span>
+  <span class="c-msg" id="conn-msg">connecting to bitcoind…</span>
+  <span class="c-countdown" id="conn-countdown"></span>
+  <button class="c-retry" id="conn-retry" style="display:none">retry now</button>
+</div>
+
+<!-- NODE WARNINGS BANNER -->
+<div id="node-warnings"></div>
+
+<!-- STATUSBAR -->
+<div id="statusbar">
+  <div class="sb-left">
+    <span class="sb-err" id="sb-err"></span>
+    <span id="sb-hidden-wrap"></span>
+  </div>
+</div>
+<span class="sb-stale" id="sb-stale"></span>
+
+</div><!-- #app -->
+
+
+<!-- CONTEXT MENU -->
+<div id="ctx-menu" style="display:none"></div>
+
+
+<script src="blockwatch.js"></script>
+</body>
+</html>
