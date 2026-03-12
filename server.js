@@ -126,7 +126,7 @@ function printBanner(){
   const bar=c(A.t4,'-'.repeat(Math.min(W-4,38)));
   process.stdout.write('\n');
   process.stdout.write('  '+c(A.t1,'BLOCKWATCH')+'\n');
-  process.stdout.write('  '+bar+'\n\n');
+  process.stdout.write('  '+bar+'\n');
 }
 
 async function loadAuth(){
@@ -387,29 +387,11 @@ const server=http.createServer(async(req,res)=>{
       row('warning','dashboard exposed on '+SERVER_HOST+' — ensure firewall is set',A.neg);
     }
     row('node',RPC_HOST+':'+RPC_PORT);
-    rpc('getblockchaininfo')
-      .then(bc=>{
-        if(bc.blocks!=null) row('height', '#'+bc.blocks.toLocaleString(), A.pos);
-        if(bc.verificationprogress!=null){
-          const pct=(bc.verificationprogress*100).toFixed(3);
-          if(bc.initialblockdownload){
-            row('sync', pct+'%  IBD in progress', A.t3);
-          } else {
-            row('sync', pct+'%  '+c(A.grn,'synced'), A.t2);
-          }
-        }
-        if(bc.chain && bc.chain !== 'main') row('chain', bc.chain, A.pos);
-        const bar=c(A.t4,'-'.repeat(Math.min(W-4,38)));
-        process.stdout.write('\n  '+bar+'\n');
-        row('dashboard', 'http://'+SERVER_HOST+':'+SERVER_PORT, A.pos);
-        row('health',    'http://'+SERVER_HOST+':'+SERVER_PORT+'/api/health', A.t3);
-        process.stdout.write('\n');
-      })
-      .catch(e=>{
-        row('error', e.message, A.neg);
-        process.stdout.write('\n  '+c(A.neg,'connection failed')+'\n');
-        process.stdout.write('  '+c(A.t4,'check that bitcoind is running and rpc is enabled')+'\n\n');
-      });
+    const bar=c(A.t4,'-'.repeat(Math.min(W-4,38)));
+    process.stdout.write('  '+bar+'\n');
+    row('dashboard', 'http://'+SERVER_HOST+':'+SERVER_PORT, A.pos);
+    row('health',    'http://'+SERVER_HOST+':'+SERVER_PORT+'/api/health', A.t3);
+    process.stdout.write('\n');
   });
 })();
 

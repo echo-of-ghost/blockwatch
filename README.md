@@ -370,4 +370,4 @@ If a second browser tab (or a slow poll overlapping the next interval) hits the 
 
 ## License
 
-MIT
+GNU GENERAL PUBLIC LICENSE
