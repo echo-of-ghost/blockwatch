@@ -212,11 +212,18 @@ async function fetchAll(){
 }
 async function _doFetchAll(){
   const[blockchain,networkInfo,mempoolInfo]=await Promise.all([
-    rpc('getblockchaininfo'),rpc('getnetworkinfo'),rpc('getmempoolinfo'),
+    safe('getblockchaininfo'),safe('getnetworkinfo'),safe('getmempoolinfo'),
   ]);
+  // If getblockchaininfo failed entirely, return a minimal error payload
+  // so the client shows the connecting overlay instead of crashing.
+  if(!blockchain||typeof blockchain!=='object'||blockchain.blocks==null){
+    return{error:'getblockchaininfo unavailable',blockchain:blockchain||{},networkInfo:networkInfo||{},
+      mempoolInfo:mempoolInfo||{},peers:[],blocks:[],chainTxStats:{},fees:{},netTotals:{},
+      uptime:0,deploymentInfo:{},chainTips:[],ts:Date.now(),rpcNode:RPC_HOST+':'+RPC_PORT};
+  }
   const ibd=blockchain.initialblockdownload||false;
   const[peerInfo,netTotals,uptime,deploymentInfo,chainTxStats,chainTips]=await Promise.all([
-    rpc('getpeerinfo'),rpc('getnettotals'),safe('uptime'),safe('getdeploymentinfo'),
+    safe('getpeerinfo'),safe('getnettotals'),safe('uptime'),safe('getdeploymentinfo'),
     blockchain.blocks>=1?safe('getchaintxstats',[Math.min(2016,blockchain.blocks)]):Promise.resolve(null),
     safe('getchaintips'),
   ]);
@@ -248,7 +255,8 @@ async function _doFetchAll(){
       mediantime:hdr.mediantime??0,chainwork:hdr.chainwork??'',feePercentiles:st.feerate_percentiles??null,};
   }).filter(Boolean);
   const ni=networkInfo||{};
-  return{blockchain,networkInfo:ni,mempoolInfo:mempoolInfo||{},peers:peerInfo||[],
+  const safePeers=Array.isArray(peerInfo)?peerInfo:[];
+  return{blockchain,networkInfo:ni,mempoolInfo:mempoolInfo||{},peers:safePeers,
     blocks,chainTxStats:chainTxStats||{},
     // conf_target values are included so the client label always matches what was requested.
     // If you change the targets here, the client labels update automatically.
@@ -258,7 +266,7 @@ async function _doFetchAll(){
       slow:feeSlow?.feerate?Math.round(feeSlow.feerate*1e5):null, slow_target:144,
       eco: feeEco?.feerate ?Math.round(feeEco.feerate *1e5):null, eco_target:1008,
     },
-    netTotals:netTotals||{},uptime:uptime||0,deploymentInfo:deploymentInfo||{},chainTips:chainTips||[],
+    netTotals:netTotals||{},uptime:uptime||0,deploymentInfo:deploymentInfo||{},chainTips:Array.isArray(chainTips)?chainTips:[],
     minrelaytxfee:ni.minrelaytxfee??null,
     incrementalfee:ni.incrementalfee??null,
     networkWarnings:Array.isArray(ni.warnings)?ni.warnings.join(' '):(ni.warnings||''),
@@ -302,6 +310,7 @@ const server=http.createServer(async(req,res)=>{
     "form-action 'self'"
   );
   res.setHeader('Permissions-Policy','camera=(),microphone=(),geolocation=(),payment=()');
+  res.setHeader('Referrer-Policy','no-referrer');
   res.setHeader('X-Frame-Options','DENY');
   res.setHeader('X-Content-Type-Options','nosniff');
   if(req.method==='OPTIONS'){res.writeHead(204);res.end();return;}
@@ -339,8 +348,15 @@ const server=http.createServer(async(req,res)=>{
     // Only allow loopback connections. If you set HOST=0.0.0.0, this dashboard
     // becomes network-accessible — do NOT do that on an untrusted network.
     const remote=req.socket.remoteAddress;
-    const isLoopback=remote==='127.0.0.1'||remote==='::1'||remote==='::ffff:127.0.0.1'
-      ||(typeof remote==='string'&&remote.startsWith('::ffff:127.'));
+    const isLoopback=(()=>{
+      if(!remote) return false;
+      if(remote==='::1') return true;
+      const ipv4=remote.startsWith('::ffff:')?remote.slice(7):remote;
+      const parts=ipv4.split('.');
+      if(parts.length!==4) return false;
+      const nums=parts.map(Number);
+      return nums.every((n,i)=>Number.isInteger(n)&&n>=0&&n<=255)&&nums[0]===127;
+    })();
     if(!isLoopback){
       res.writeHead(403,{'Content-Type':'application/json'});res.end(JSON.stringify({error:'forbidden'}));return;
     }

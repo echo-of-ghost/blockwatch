@@ -12,12 +12,12 @@
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="blockwatch.css">
 </head>
-<noscript><style>body{display:flex;align-items:center;justify-content:center;height:100vh;background:#080808;color:#686868;font-family:monospace;font-size:12px}</style><div style="text-align:center">blockwatch requires javascript</div></noscript>
 <body>
-<div id="app">
+<noscript><style>body{display:flex;align-items:center;justify-content:center;height:100vh;background:#080808;color:#686868;font-family:monospace;font-size:12px}</style><div style="text-align:center">blockwatch requires javascript</div></noscript>
+<div id="app" role="application" aria-label="blockwatch Bitcoin node dashboard">
 
 <!-- TITLEBAR -->
-<div id="titlebar">
+<div id="titlebar" role="banner">
   <div class="tl">
     <span class="tb-logo"><b></b>&nbsp;blockwatch</span>
     <span class="tb-sep">│</span>
@@ -29,12 +29,12 @@
     <span class="tb-sync-badge" id="tb-sync" style="display:none"></span>
   </div>
   <div class="tr">
-    <span class="tb-height-main" id="tb-height">—</span>
+    <span class="tb-height-main" id="tb-height" aria-live="polite" aria-label="Block height">—</span>
     <span class="tb-sep">·</span>
     <span class="tb-dim" id="clock">—</span><span class="tb-dim" style="margin-left:3px;color:var(--t4);font-size:9px">UTC</span>
     <span class="tb-sep">·</span>
-    <button id="snapshot-btn" class="ph-tsv-btn snapshot-btn">snapshot ↓</button>
-    <span class="dot" id="live-dot"></span>
+    <button id="snapshot-btn" class="ph-tsv-btn snapshot-btn" aria-label="Download JSON snapshot">snapshot ↓</button>
+    <span class="dot" id="live-dot" role="status" aria-label="Connection status"></span>
   </div>
 </div>
 
@@ -82,7 +82,7 @@
 
         <div class="sec" style="display:flex;align-items:center;justify-content:space-between;gap:6px">
           <span>reachable addresses</span>
-          <button class="la-toggle" id="la-reveal-btn">reveal</button>
+          <button class="la-toggle" id="la-reveal-btn" aria-label="Toggle local address visibility">reveal</button>
         </div>
         <div id="ni-localaddrs"><span style="font-size:9px;color:var(--t4);padding:2px 0;display:block">—</span></div>
       </div>
@@ -162,7 +162,7 @@
     <div class="panel" id="p-col3-top" data-panel="blocks">
       <div class="ph"><span class="ph-drag">⠿</span><span class="ph-title">blocks</span><span class="ph-sep">|</span><span class="ph-meta" id="blk-ph">—</span><button class="ph-close">×</button></div>
       <div class="scroll-area">
-        <table class="tbl">
+        <table class="tbl" aria-label="Recent blocks">
           <thead><tr><th>#</th><th>hash</th><th>txs</th><th>in/out</th><th>fill</th><th>age</th></tr></thead>
           <tbody id="blk-body"></tbody>
         </table>
@@ -202,9 +202,9 @@
   <!-- COL 4: PEERS + SERVICES + BANNED + DETAIL -->
   <div class="col-wrap" id="col4">
     <div class="panel" id="p-col4-top" data-panel="peers">
-      <div class="ph"><span class="ph-drag">⠿</span><span class="ph-title">peers</span><span class="ph-sep">|</span><span class="ph-meta" id="peer-in-ph" style="flex:0 0 auto">—</span><span style="color:var(--t4);margin:0 4px;flex-shrink:0">·</span><span class="ph-meta" style="flex:0 0 auto" id="peer-out-ph">—</span><span class="ph-right"><button id="peers-tsv-btn" class="ph-tsv-btn">peers ↓</button><button class="ph-close">×</button></span></div>
+      <div class="ph"><span class="ph-drag">⠿</span><span class="ph-title">peers</span><span class="ph-sep">|</span><span class="ph-meta" id="peer-in-ph" style="flex:0 0 auto">—</span><span style="color:var(--t4);margin:0 4px;flex-shrink:0">·</span><span class="ph-meta" style="flex:0 0 auto" id="peer-out-ph">—</span><span class="ph-right"><button id="peers-tsv-btn" class="ph-tsv-btn" aria-label="Export peers as TSV">peers ↓</button><button class="ph-close">×</button></span></div>
       <div class="scroll-area">
-        <table class="tbl" id="peer-tbl">
+        <table class="tbl" id="peer-tbl" aria-label="Connected peers">
           <thead><tr><th></th><th>address</th><th>net</th><th>version</th><th style="text-align:right">blks</th><th style="text-align:right">ping</th><th style="text-align:right">↑</th><th style="text-align:right">↓</th></tr></thead>
           <tbody id="peer-table-body"></tbody>
         </table>
@@ -224,11 +224,11 @@
     </div>
     <div class="panel" id="p-col4-bot" data-panel="peer-detail">
       <div class="ph"><span class="ph-drag">⠿</span><span class="ph-title">peer detail</span><span class="ph-sep">|</span><span class="ph-meta" id="pd-ph">—</span><button class="ph-close">×</button></div>
-      <div class="pd-tabs" id="pd-tabs">
-        <button class="pd-tab active" data-tab="conn">conn</button>
-        <button class="pd-tab" data-tab="sync">sync</button>
-        <button class="pd-tab" data-tab="bw">bw</button>
-        <button class="pd-tab" data-tab="gossip">gossip</button>
+      <div class="pd-tabs" id="pd-tabs" role="tablist" aria-label="Peer detail sections">
+        <button class="pd-tab active" data-tab="conn" role="tab" aria-selected="true">conn</button>
+        <button class="pd-tab" data-tab="sync" role="tab" aria-selected="false">sync</button>
+        <button class="pd-tab" data-tab="bw" role="tab" aria-selected="false">bw</button>
+        <button class="pd-tab" data-tab="gossip" role="tab" aria-selected="false">gossip</button>
       </div>
       <div class="pb" id="peer-detail-body">
         <div class="pd-empty">click a peer to inspect</div>
@@ -239,25 +239,25 @@
 </div><!-- #main -->
 
 <!-- CONNECTING -->
-<div id="connecting">
-  <div class="c-spin"></div>
+<div id="connecting" role="alert" aria-live="assertive">
+  <div class="c-spin" role="status" aria-label="Loading"></div>
   <span class="c-logo"><b></b>&nbsp;blockwatch</span>
   <span class="c-msg" id="conn-msg">connecting to bitcoind…</span>
   <span class="c-countdown" id="conn-countdown"></span>
-  <button class="c-retry" id="conn-retry" style="display:none">retry now</button>
+  <button class="c-retry" id="conn-retry" style="display:none" aria-label="Retry connection">retry now</button>
 </div>
 
 <!-- NODE WARNINGS BANNER -->
-<div id="node-warnings"></div>
+<div id="node-warnings" role="alert" aria-live="polite"></div>
 
 <!-- STATUSBAR -->
-<div id="statusbar">
+<div id="statusbar" role="status">
   <div class="sb-left">
-    <span class="sb-err" id="sb-err"></span>
+    <span class="sb-err" id="sb-err" role="alert" aria-live="polite"></span>
     <span id="sb-hidden-wrap"></span>
   </div>
 </div>
-<span class="sb-stale" id="sb-stale"></span>
+<span class="sb-stale" id="sb-stale" role="status" aria-live="polite"></span>
 
 </div><!-- #app -->
 
