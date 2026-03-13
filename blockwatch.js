@@ -708,7 +708,7 @@ const peersPanel = {
 
       return `<tr data-pid="${p.id}" class="${p.id===this._selectedId?'peer-sel':''}${isStale?' peer-stale':''}">
         <td class="td-dir"><span style="color:${p.inbound?'var(--grn)':'var(--t3)'}">${p.inbound?'↓':'↑'}</span></td>
-        <td class="td-hash td-peer-addr copyable" data-copy="${addr}">${addr||'—'}</td>
+        <td class="td-hash td-peer-addr copyable" data-copy="${addr}"><span class="peer-addr-main">${addr||'—'}</span><span class="peer-addr-bars"><span class="peer-addr-bar-sent"><span class="peer-addr-bar-fill" style="width:${sentPct}%;background:var(--pos)"></span></span><span class="peer-addr-bar-recv"><span class="peer-addr-bar-fill" style="width:${recvPct}%;background:var(--orange)"></span></span></span></td>
         <td class="td-net" style="color:${netColor}">${esc(net)}</td>
         <td class="td-ver td-dim">${ver}</td>
         <td class="td-dim td-r">${fb(p.synced_blocks||0)}</td>
@@ -1005,10 +1005,10 @@ const blocksPanel = {
 
     set('blk-ph', blocks.length?'tip #'+fb(blocks[0].height):'—');
 
-      document.getElementById('blk-body').innerHTML=blocks.map((b,i)=>{
+    document.getElementById('blk-body').innerHTML=blocks.map((b,i)=>{
         return `
       <tr class="${i===0?'new':''} ${b.height===this._selectedHeight?'peer-sel':''}" data-bheight="${b.height}">
-        <td class="td-num"><a class="ext-link" href="${utils.mspaceUrl(b.hash,nodePanel.currentChain)}" target="_blank" rel="noopener">${fb(b.height)}</a></td>
+        <td class="td-num"><a class="ext-link" href="${utils.mspaceUrl(b.hash,nodePanel.currentChain)}" target="_blank" rel="noopener noreferrer">${fb(b.height)}</a></td>
         <td class="td-hash" style="white-space:nowrap;cursor:pointer" data-copy="${esc(b.hash||'')}"><em>${(b.hash||'').slice(0,4)}</em>${(b.hash||'').slice(4,8)}…${(b.hash||'').slice(-4)}</td>
         <td class="td-dim">${fb(b.txs)}</td>
         <td class="td-inout">${b.ins||b.outs?fb(b.ins)+'<span style="color:var(--t4)">·</span>'+fb(b.outs):'—'}</td>
@@ -1071,13 +1071,13 @@ const blocksPanel = {
     const pctStr=(()=>{
       const p=b.feePercentiles;
       if(!p||p.length<5) return null;
-      const fmt=v=>v>=1?Math.round(v):v.toFixed(1);
+      const fmt=v=>esc(v>=1?String(Math.round(v)):v.toFixed(1));
       return `${fmt(p[0])} · ${fmt(p[1])} · <span class="o2">${fmt(p[2])}</span> · ${fmt(p[3])} · ${fmt(p[4])}`;
     })();
 
     if(el) el.innerHTML=`
       <div class="kv"><span class="k">height</span><span class="v">${fb(b.height)}</span></div>
-      <div class="kv"><span class="k">hash</span><span class="v mono v-copyable"><a class="ext-link" href="${utils.mspaceUrl(b.hash,nodePanel.currentChain)}" target="_blank" rel="noopener"><em>${(b.hash||'').slice(0,6)}</em>…${(b.hash||'').slice(-6)}</a><span data-copy="${esc(b.hash||'')}" class="copy-icon">⎘</span></span></div>
+      <div class="kv"><span class="k">hash</span><span class="v mono v-copyable"><a class="ext-link" href="${utils.mspaceUrl(b.hash,nodePanel.currentChain)}" target="_blank" rel="noopener noreferrer"><em>${(b.hash||'').slice(0,6)}</em>…${(b.hash||'').slice(-6)}</a><span data-copy="${esc(b.hash||'')}" class="copy-icon">⎘</span></span></div>
       <div class="kv"><span class="k">age · txs</span><span class="v"><span class="dim">${b.time?utils.fmtAgeAgo(now-b.time):'—'}</span><span class="v-pair-sep"> · </span><span class="o2">${fb(b.txs)}</span></span></div>
       <div class="kv"><span class="k">in · out</span><span class="v dim">${b.ins?fb(b.ins):'-'}<span class="v-pair-sep"> · </span>${b.outs?fb(b.outs):'-'}</span></div>
       <div class="kv"><span class="k">size · fill</span><span class="v dim">${utils.fmtBytes(b.size)}<span class="v-pair-sep"> · </span><span class="${fillCls}">${fillPct?f(fillPct,0)+'%':'—'}</span></span></div>
@@ -1622,7 +1622,10 @@ const layout = {
       if(i < vis.length - 1){
         const bar = document.createElement('div');
         bar.className = 'panel-resize-bar';
-        p.after(bar);
+        // Insert before next visible panel, NOT after current. p.after(bar)
+        // would place the bar before hidden panels sitting between the two
+        // visible ones in the DOM, causing the resize walker to find them.
+        vis[i + 1].before(bar);
         this._initBar(bar, p);
       }
     });
@@ -1632,8 +1635,12 @@ const layout = {
     bar.addEventListener('mousedown', e => {
       e.preventDefault(); e.stopPropagation();
       const MIN_H = this._MIN_H;
+      // Walk forward to find the next VISIBLE panel. Hidden panels (display:none)
+      // have offsetHeight 0 which collapses the resize budget to nothing,
+      // causing the snap-up bug on every drag.
       let bot = bar.nextElementSibling;
-      while(bot && !bot.classList.contains('panel')) bot = bot.nextElementSibling;
+      while(bot && (!bot.classList.contains('panel') || bot.style.display === 'none')) bot = bot.nextElementSibling;
+      if(!bot || !bot.offsetHeight) return; // no valid bottom panel — bail
       const y0  = e.clientY;
       const h0  = topPanel.offsetHeight;
       const bh0 = bot ? bot.offsetHeight : 0;
@@ -1693,12 +1700,17 @@ const layout = {
 
   _initPanelControls(panel){
     if(panel._ctxInit) return; panel._ctxInit=true;
+    const name = panel.dataset.panel || 'panel';
     const ph=panel.querySelector('.ph');
     if(ph){
+      ph.setAttribute('aria-label', name + ' panel — drag to reorder');
       ph.addEventListener('contextmenu',e=>{ e.preventDefault(); e.stopPropagation(); contextMenu.show(panel,e.clientX+2,e.clientY+2); });
     }
     const closeBtn=panel.querySelector('.ph-close');
-    if(closeBtn){ closeBtn.addEventListener('click',e=>{ e.stopPropagation(); this.hidePanel(panel); }); }
+    if(closeBtn){
+      closeBtn.setAttribute('aria-label', 'Hide ' + name + ' panel');
+      closeBtn.addEventListener('click',e=>{ e.stopPropagation(); this.hidePanel(panel); });
+    }
   },
 
   _initDrag(panel){
@@ -1911,6 +1923,7 @@ function renderAll(d){
   safeRender('feeSubsidy',  ()=> charts.feeSubsidy.draw(d.blocks||[]));
   safeRender('blockTiming', ()=> charts.blockTiming.draw(d.blocks||[]));
 }
+
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
