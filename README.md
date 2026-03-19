@@ -4,7 +4,9 @@ A real-time Bitcoin node dashboard. Connects directly to your local Bitcoin Core
 
 No dependencies beyond Node.js. No external APIs. Your node, your data.
 
-![blockwatch dashboard — mainnet](screenshot-mainnet.png)
+![blockwatch — live demo](demo.gif)
+
+> A 10–15 second recording showing a block arriving, mempool updating, and peers refreshing. To record your own: run blockwatch against mainnet, use [LICEcap](https://www.cockos.com/licecap/) (Windows/macOS) or `peek` (Linux) to capture the browser at ~1280px wide, and save as `demo.gif` in the repo root.
 
 ---
 
@@ -35,7 +37,7 @@ No dependencies beyond Node.js. No external APIs. Your node, your data.
 |---|---|---|---|
 | ![mainnet](screenshot-mainnet.png) | ![testnet4](screenshot-testnet4.png) | ![signet](screenshot-signet.png) | ![regtest](screenshot-regtest.png) |
 
-> Screenshots are captured from a live node. To add your own: run blockwatch against each network, take a full-browser screenshot at your preferred width, and save as `screenshot-mainnet.png`, `screenshot-testnet4.png`, `screenshot-signet.png`, and `screenshot-regtest.png` in the repo root.
+> To add your own: run blockwatch against each network, take a full-browser screenshot at your preferred width, and save as `screenshot-mainnet.png`, `screenshot-testnet4.png`, `screenshot-signet.png`, and `screenshot-regtest.png` in the repo root.
 
 ---
 
@@ -151,6 +153,49 @@ HOST=0.0.0.0 node server.js
 
 ---
 
+## Health endpoint
+
+blockwatch exposes a lightweight health endpoint at `/health` (also `/api/health`) for use with process monitors, uptime checkers, and systemd readiness probes.
+
+```
+GET http://localhost:3000/health
+```
+
+**Response — node reachable (`200 OK`):**
+```json
+{
+  "ok": true,
+  "height": 895210,
+  "chain": "main",
+  "synced": true,
+  "ibd": false,
+  "progress": 99.999,
+  "headers": 895210,
+  "ts": 1748000000000
+}
+```
+
+**Response — bitcoind unreachable (`503 Service Unavailable`):**
+```json
+{
+  "ok": false,
+  "error": "getblockcount: connect ECONNREFUSED 127.0.0.1:8332",
+  "ts": 1748000000000
+}
+```
+
+The endpoint makes only two RPC calls (`getblockcount`, `getblockchaininfo`) and is intentionally separate from the full `/api/data` fetch. It is not rate-limited.
+
+### systemd readiness check
+
+Add to your service file to delay dependent units until blockwatch confirms bitcoind is up:
+
+```ini
+ExecStartPost=/usr/bin/curl -sf http://127.0.0.1:3000/health
+```
+
+---
+
 ## Running as a background service
 
 To have blockwatch start automatically on boot, service files are included for both Linux and macOS.
@@ -260,49 +305,6 @@ The bottom status bar shows:
 - Staleness indicator — shows time since last successful fetch if data is stale
 - Any node warnings from `getblockchaininfo`
 - Hidden panel restore pills
-
----
-
-## Health endpoint
-
-blockwatch exposes a lightweight health endpoint at `/health` (also `/api/health`) for use with process monitors, uptime checkers, and systemd readiness probes.
-
-```
-GET http://localhost:3000/health
-```
-
-**Response — node reachable (`200 OK`):**
-```json
-{
-  "ok": true,
-  "height": 895210,
-  "chain": "main",
-  "synced": true,
-  "ibd": false,
-  "progress": 99.999,
-  "headers": 895210,
-  "ts": 1748000000000
-}
-```
-
-**Response — bitcoind unreachable (`503 Service Unavailable`):**
-```json
-{
-  "ok": false,
-  "error": "getblockcount: connect ECONNREFUSED 127.0.0.1:8332",
-  "ts": 1748000000000
-}
-```
-
-The endpoint makes only two RPC calls (`getblockcount`, `getblockchaininfo`) and is intentionally separate from the full `/api/data` fetch. It is not rate-limited.
-
-### systemd readiness check
-
-Add to your service file to delay dependent units until blockwatch confirms bitcoind is up:
-
-```ini
-ExecStartPost=/usr/bin/curl -sf http://127.0.0.1:3000/health
-```
 
 ---
 

@@ -101,7 +101,15 @@ const utils = {
   },
   copyToClipboard(text, el){
     navigator.clipboard.writeText(text).then(()=>{
-      if(el){ el.classList.add('copy-flash'); setTimeout(()=>el.classList.remove('copy-flash'),500); }
+      if(el){
+        const prev=el.textContent;
+        el.textContent='copied';
+        el.classList.add('copy-flash');
+        setTimeout(()=>{
+          el.textContent=prev;
+          el.classList.remove('copy-flash');
+        },1200);
+      }
     }).catch(()=>{});
   },
 };
@@ -155,20 +163,26 @@ const network = {
     const mx=Math.max(...this._histSent,...this._histRecv,1);
     const pad=3;
 
-    const drawLine=(hist, color, fillColor)=>{
+    const drawLine=(hist, color, gradRgb)=>{
       const pts=hist.map((v,i)=>({
         x: i/(hist.length-1)*W,
         y: H-pad-(v/mx)*(H-pad*2),
       }));
 
-      // Filled area under line
-      if(fillColor){
+      // Gradient fill — anchored to the actual peak Y of this line so low-traffic
+      // fills stay tight rather than a tall near-invisible wash
+      if(gradRgb){
+        const peakY=Math.min(...pts.map(p=>p.y));
+        const grad=ctx.createLinearGradient(0, peakY, 0, H);
+        grad.addColorStop(0,    `rgba(${gradRgb},.26)`);
+        grad.addColorStop(0.55, `rgba(${gradRgb},.09)`);
+        grad.addColorStop(1,    `rgba(${gradRgb},0)`);
         ctx.beginPath();
         ctx.moveTo(pts[0].x, H);
         pts.forEach(p=>ctx.lineTo(p.x, p.y));
         ctx.lineTo(pts[pts.length-1].x, H);
         ctx.closePath();
-        ctx.fillStyle=fillColor;
+        ctx.fillStyle=grad;
         ctx.fill();
       }
 
@@ -188,13 +202,13 @@ const network = {
       ctx.fill();
     };
 
-    // Draw recv (orange) then sent (pos/amber) on top
-    drawLine(this._histRecv, 'rgba(240,112,32,.9)',  'rgba(240,112,32,.07)');
-    drawLine(this._histSent, 'rgba(196,137,74,.75)', 'rgba(196,137,74,.05)');
+    // Draw recv (orange) then sent (amber) on top
+    drawLine(this._histRecv, 'rgba(240,112,32,.9)',  '240,112,32');
+    drawLine(this._histSent, 'rgba(196,137,74,.75)', '196,137,74');
 
     // Y-axis label: peak rate
     const peak=utils.fmtRate(mx);
-    ctx.font=`${7*dpr/dpr}px JetBrains Mono, monospace`;
+    ctx.font=`7px JetBrains Mono, monospace`;
     ctx.fillStyle='rgba(64,64,64,.9)';
     ctx.textAlign='right';
     ctx.fillText(peak, W-1, 9);
@@ -242,7 +256,7 @@ const nodePanel = {
   },
 
   _renderTitlebar(bc, ni, uptime, blocks, d={}){
-    const synced = (bc.verificationprogress||0)>=.9999;
+    const synced = (bc.verificationprogress||0)>=.9995;
     const pct    = (bc.verificationprogress||0)*100;
 
     set('tb-ver', (ni.subversion||'').replace(/^\/|\/$/g,''));
@@ -260,26 +274,8 @@ const nodePanel = {
 
     // Chain accent class — swaps CSS colour vars for non-mainnet chains
     this._currentChain=bc.chain||'main';
-    const chainNameMap={'testnet4':'testnet4','signet':'signet','regtest':'regtest'};
-    const chainClass='chain-'+(chainNameMap[bc.chain]||bc.chain||'main');
-    document.documentElement.className=bc.chain&&bc.chain!=='main'?chainClass:'';
-
-    // Swap favicon to match chain accent colour
-    const faviconColors={'testnet4':'#3a8fd4','signet':'#c8a820','regtest':'#9a5cc8','test':'#3a8fd4'};
-    const fColor=faviconColors[bc.chain]||'#f07020';
-    const fSvg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect width="16" height="16" rx="3" fill="${fColor}"/></svg>`;
-    const fEl=document.querySelector('link[rel="icon"]')||Object.assign(document.createElement('link'),{rel:'icon'});
-    fEl.type='image/svg+xml';
-    fEl.href='data:image/svg+xml,'+encodeURIComponent(fSvg);
-    if(!fEl.parentNode) document.head.appendChild(fEl);
-
+    chainTheme.apply(bc.chain||'main', bc.blocks||0);
     document.getElementById('live-dot').className='dot ok';
-
-    // Update page title — visible in tab, history, task switcher, pinned tabs
-    const chainLabel=bc.chain&&bc.chain!=='main'?' · '+bc.chain:'';
-    document.title='#'+fb(bc.blocks||0)+chainLabel+' · blockwatch';
-
-    // Node warnings banner
     const warnEl=document.getElementById('node-warnings');
     if(warnEl){
       const chainWarns=Array.isArray(bc.warnings)?bc.warnings.join(' '):((bc.warnings||'').trim());
@@ -300,7 +296,7 @@ const nodePanel = {
   },
 
   _renderNodeInfo(bc, ni, rpcNode, blocks, now){
-    const synced=(bc.verificationprogress||0)>=.9999;
+    const synced=(bc.verificationprogress||0)>=.9995;
     const pct=(bc.verificationprogress||0)*100;
     const chainDisplayName={'main':'mainnet','testnet4':'testnet4','signet':'signet','regtest':'regtest'};
     const tipTime=blocks.length?blocks[0].time:0;
@@ -367,7 +363,7 @@ const nodePanel = {
     tipListEl.innerHTML=nonActive.map(t=>{
       const statusCls=t.status==='invalid'?'neg':t.status==='valid-fork'&&t.branchlen>1?'neg':t.status==='valid-headers'?'o':'dim';
       const hash=t.hash||'';
-      const hashShort=hash?`<em>${hash.slice(0,4)}</em>${hash.slice(4,8)}…${hash.slice(-4)}`:'—';
+      const hashShort=hash?`${hash.slice(0,4)}${hash.slice(4,8)}…<em>${hash.slice(-4)}</em>`:'—';
       const copySpan=hash?`<span data-copy="${esc(hash)}" class="copy-icon">⎘</span>`:'';
       return `<div class="tip-row">
         <span class="tip-height">#${fb(t.height||0)}</span>
@@ -489,7 +485,7 @@ const nodePanel = {
     if(!el) return;
     const nets=ni.networks||[];
     if(!nets.length){
-      el.innerHTML='<span style="font-size:9px;color:var(--t4);padding:2px 0;display:block">—</span>';
+      el.innerHTML='<span class="ni-placeholder">—</span>';
       return;
     }
     const ORDER=['ipv4','ipv6','onion','i2p','cjdns'];
@@ -533,7 +529,7 @@ const nodePanel = {
     const el=document.getElementById('ni-localaddrs');
     if(!el) return;
     if(!this._lastLocalAddrs.length){
-      el.innerHTML='<span style="font-size:9px;color:var(--t4);padding:2px 0;display:block">not reachable / no external address</span>';
+      el.innerHTML='<span class="ni-placeholder">not reachable / no external address</span>';
       return;
     }
     const MASK='•••••••••••••••••••';
@@ -541,12 +537,12 @@ const nodePanel = {
       const addr=esc(a.address||'');
       const score=a.score!=null?a.score:'';
       const type=addr.endsWith('.onion')?'onion':(addr.startsWith('[')||(addr.includes(':')&&!addr.includes('.')))?'ipv6':'ipv4';
-      const typeColor=type==='onion'?'var(--orange)':type==='ipv6'?'var(--pos)':'var(--t4)';
+      const typeClass=type==='onion'?'la-type-onion':type==='ipv6'?'la-type-ipv6':'la-type-ipv4';
       const display=this._localAddrsRevealed?addr:MASK;
       const cls=this._localAddrsRevealed?'la-addr':'la-addr masked';
       return `<div class="la-row">
         <span class="${cls}">${display}</span>
-        <span class="la-type" style="color:${typeColor}">${type}</span>
+        <span class="la-type ${typeClass}">${type}</span>
         ${score!==''?`<span class="la-score">s:${score}</span>`:''}
       </div>`;
     }).join('');
@@ -612,7 +608,7 @@ const chainPanel = {
     const el=document.getElementById('fee-rows');
     if(!el) return;
     if(!feeList.length){
-      el.innerHTML='<div style="font-size:8.5px;color:var(--t4);padding:4px 0">no fee data — estimator warming up</div>';
+      el.innerHTML='<div class="fee-empty">no fee data — estimator warming up</div>';
       return;
     }
     const maxRate=Math.max(...feeList.map(e=>e.rate));
@@ -659,6 +655,7 @@ const peersPanel = {
   render(d){
     const peers=d.peers||[];
     const ni=d.networkInfo||{};
+    const ibd=d.blockchain?.initialblockdownload||false;
     const now=Date.now()/1000;
     this._cache=peers;
 
@@ -669,6 +666,12 @@ const peersPanel = {
     set('peer-in-ph', '↓ '+connIn+' in');
     set('peer-out-ph','↑ '+connOut+' out');
 
+    if(ibd&&!peers.length){
+      document.getElementById('peer-table-body').innerHTML=
+        '<tr><td colspan="8" class="ibd-placeholder">peer data unavailable during initial sync</td></tr>';
+      return;
+    }
+
     const bestPeerBlock=peers.reduce((best,p)=>Math.max(best,p.last_block||0),0);
 
     // Compute max bytes for proportional bandwidth bars across all peers
@@ -677,11 +680,13 @@ const peersPanel = {
 
     document.getElementById('peer-table-body').innerHTML=peers.map(p=>{
       const net=utils.peerNet(p.addr||'',p.network||'');
-      const netColor=net==='onion'?'var(--orange)':'var(--t3)';
+      const netClass=net==='onion'?'td-net-onion':net==='i2p'?'td-net-i2p':'td-net-default';
+      const dirClass=p.inbound?'td-inbound':'td-outbound';
       const pc=p.pingtime>0?(p.pingtime<0.06?'grn':p.pingtime<0.18?'dim':'neg'):'dim';
       const ping=p.pingtime>0?Math.round(p.pingtime*1000)+'ms':'—';
       const ver=esc((p.subver||'').replace(/^\/|\/$/g,''));
-      const addr=esc(p.addr||'');
+      const addrFull=esc(p.addr||'');
+      const addr=esc((p.addr||'').replace(/:\d+$/,'').replace(/^\[(.+)\]$/,'$1'));
       const isBlockRelay=(p.connection_type||'').includes('block-relay');
       const connAge=p.conntime?(now-p.conntime):0;
       const peerBlockAge=p.last_block>0?(now-p.last_block):Infinity;
@@ -703,14 +708,14 @@ const peersPanel = {
       const bwRecvCell=`<div class="peer-bw-wrap"><span class="peer-bw-val">${utils.fmtBytes(p.bytesrecv||0)}</span><div class="peer-bw-bar"><div class="peer-bw-fill" style="width:${recvPct}%;background:var(--orange)"></div></div></div>`;
 
       return `<tr data-pid="${p.id}" class="${p.id===this._selectedId?'peer-sel':''}${isStale?' peer-stale':''}">
-        <td class="td-dir"><span style="color:${p.inbound?'var(--grn)':'var(--t3)'}">${p.inbound?'↓':'↑'}</span></td>
-        <td class="td-hash td-peer-addr copyable" data-copy="${addr}"><span class="peer-addr-main">${addr||'—'}</span><span class="peer-addr-bars"><span class="peer-addr-bar-sent"><span class="peer-addr-bar-fill" style="width:${sentPct}%;background:var(--pos)"></span></span><span class="peer-addr-bar-recv"><span class="peer-addr-bar-fill" style="width:${recvPct}%;background:var(--orange)"></span></span></span></td>
-        <td class="td-net" style="color:${netColor}">${esc(net)}</td>
+        <td class="td-dir"><span class="${dirClass}">${p.inbound?'↓':'↑'}</span></td>
+        <td class="td-hash td-peer-addr copyable" data-copy="${addrFull}"><span class="peer-addr-main">${addr||'—'}</span><span class="peer-addr-bars"><span class="peer-addr-bar-sent"><span class="peer-addr-bar-fill" style="width:${sentPct}%;background:var(--pos)"></span></span><span class="peer-addr-bar-recv"><span class="peer-addr-bar-fill" style="width:${recvPct}%;background:var(--orange)"></span></span></span></td>
+        <td class="td-net ${netClass}">${esc(net)}</td>
         <td class="td-ver td-dim">${ver}</td>
         <td class="td-dim td-r">${fb(p.synced_blocks||0)}</td>
-        <td class="td-r" style="white-space:nowrap">${pingCell}</td>
-        <td class="td-r" style="padding-top:2px;padding-bottom:2px">${bwSentCell}</td>
-        <td class="td-r" style="padding-top:2px;padding-bottom:2px">${bwRecvCell}</td>
+        <td class="td-r">${pingCell}</td>
+        <td class="td-r td-bw">${bwSentCell}</td>
+        <td class="td-r td-bw">${bwRecvCell}</td>
       </tr>`;
     }).join('');
 
@@ -738,21 +743,20 @@ const peersPanel = {
     const net=utils.peerNet(p.addr||'',p.network||'');
     const now=Date.now()/1000;
     const verClean=esc((p.subver||'').replace(/^\/|\/$/g,''));
-    const netColor=net==='onion'?'var(--orange)':net==='i2p'?'var(--pos)':'var(--t2)';
+    const netClass=net==='onion'?'td-net-onion':net==='i2p'?'td-net-i2p':net==='ipv6'?'td-net-ipv6':'td-net-default';
     const addrDisplay=(p.addr||'').replace(/:\d+$/,'').replace(/^\[(.+)\]$/,'$1');
     set('pd-ph', addrDisplay||'—');
 
-    // Connection type with feeler/addr-fetch distinction
     const ct=p.connection_type||'';
-    const CT_COLOR={
-      'outbound-full-relay':'var(--t2)',
-      'block-relay-only':'var(--pos)',
-      'inbound':'var(--grn)',
-      'feeler':'var(--orange)',
-      'addr-fetch':'var(--orange)',
-      'manual':'var(--t1)',
+    const CT_CLASS={
+      'outbound-full-relay':'ct-outbound',
+      'block-relay-only':'ct-block-relay',
+      'inbound':'ct-inbound',
+      'feeler':'ct-feeler',
+      'addr-fetch':'ct-feeler',
+      'manual':'ct-manual',
     };
-    const ctColor=CT_COLOR[ct]||'var(--t3)';
+    const ctClass=CT_CLASS[ct]||'ct-default';
     const ctLabel=ct||'—';
 
     // Permissions decode (bitmask string or array)
@@ -773,20 +777,20 @@ const peersPanel = {
 
     const tabs={
       conn:`
-        <div class="kv"><span class="k">address</span><span class="v mono v-copyable" style="word-break:break-all;white-space:normal;line-height:1.5;text-align:right">${esc(p.addr||'—')}<span data-copy="${esc(p.addr||'')}" class="copy-icon">⎘</span></span></div>
-        <div class="kv"><span class="k">net · dir</span><span class="v"><span style="color:${netColor}">${esc(net)}</span><span class="dim"> · ${p.inbound?'← in':'→ out'}</span></span></div>
-        <div class="kv"><span class="k">type</span><span class="v" style="color:${ctColor}">${esc(ctLabel)}</span></div>
+        <div class="kv"><span class="k">address</span><span class="v mono v-copyable v-addr">${esc(p.addr||'—')}<span data-copy="${esc(p.addr||'')}" class="copy-icon">⎘</span></span></div>
+        <div class="kv"><span class="k">net · dir</span><span class="v"><span class="${netClass}">${esc(net)}</span><span class="dim"> · ${p.inbound?'← in':'→ out'}</span></span></div>
+        <div class="kv"><span class="k">type</span><span class="v ${ctClass}">${esc(ctLabel)}</span></div>
         <div class="kv"><span class="k">transport</span><span class="v dim">${esc(p.transport_protocol_type||'—')}</span></div>
-        <div class="kv"><span class="k">session id</span><span class="v mono" style="text-align:right;word-break:break-all;white-space:normal;line-height:1.5">${p.session_id?esc(p.session_id.slice(0,16))+'…':'—'}</span></div>
+        <div class="kv"><span class="k">session id</span><span class="v mono v-addr">${p.session_id?esc(p.session_id.slice(0,16))+'…':'—'}</span></div>
         <div class="kv"><span class="k">relay txs</span><span class="v ${p.relaytxes===false?'neg':''}">${p.relaytxes===false?'no':'yes'}</span></div>
         <div class="kv"><span class="k">ASN</span><span class="v dim">${asnStr!=null?esc(asnStr):'—'}</span></div>
-        ${p.addr_local?`<div class="kv"><span class="k">addr local</span><span class="v mono" style="text-align:right;word-break:break-all;white-space:normal;line-height:1.5">${esc(p.addr_local)}</span></div>`:''}
+        ${p.addr_local?`<div class="kv"><span class="k">addr local</span><span class="v mono v-addr">${esc(p.addr_local)}</span></div>`:''}
         <div class="sec">version</div>
         <div class="kv"><span class="k">protocol</span><span class="v dim">${esc(String(p.version||'—'))}</span></div>
-        <div class="kv"><span class="k">user agent</span><span class="v" style="text-align:right"><span class="pd-ua-badge" style="display:inline;word-break:break-all;white-space:normal;line-height:1.8">${verClean||'—'}</span></span></div>
+        <div class="kv"><span class="k">user agent</span><span class="v v-wrap"><span class="pd-ua-badge">${verClean||'—'}</span></span></div>
         <div class="sec">permissions</div>
         <div class="kv"><span class="k">whitelisted</span><span class="v dim">${esc(whitelistedStr)}</span></div>
-        <div class="kv"><span class="k">flags</span><span class="v dim" style="word-break:break-all;white-space:normal;text-align:right;line-height:1.5">${esc(permsStr)}</span></div>
+        <div class="kv"><span class="k">flags</span><span class="v dim v-wrap">${esc(permsStr)}</span></div>
         <div class="sec">services</div>
         <div class="pd-svc">${svcs.map(s=>{
           const cls=(['NETWORK','WITNESS'].includes(s))?'svc-core':(['BLOOM','COMPACT_FILTERS','P2P_V2'].includes(s))?'svc-cap':'svc-ltd';
@@ -794,12 +798,12 @@ const peersPanel = {
         }).join('')}</div>
         <div class="sec">actions</div>
         <div class="peer-actions">
-          <button class="pa-btn" data-pa="disconnect">disconnect</button>
-          <button class="pa-btn pa-ban" data-pa="ban1h">ban 1h</button>
-          <button class="pa-btn pa-ban" data-pa="ban24h">ban 24h</button>
-          <button class="pa-btn pa-ban" data-pa="ban7d">ban 7d</button>
-          <button class="pa-btn pa-ban" data-pa="ban30d">ban 30d</button>
-          <button class="pa-btn pa-ban" data-pa="banperm">ban ∞</button>
+          <button type="button" class="pa-btn" data-pa="disconnect">disconnect</button>
+          <button type="button" class="pa-btn pa-ban" data-pa="ban1h">ban 1h</button>
+          <button type="button" class="pa-btn pa-ban" data-pa="ban24h">ban 24h</button>
+          <button type="button" class="pa-btn pa-ban" data-pa="ban7d">ban 7d</button>
+          <button type="button" class="pa-btn pa-ban" data-pa="ban30d">ban 30d</button>
+          <button type="button" class="pa-btn pa-ban" data-pa="banperm">ban ∞</button>
         </div>`,
 
       sync:`
@@ -860,21 +864,56 @@ const peersPanel = {
 
   _wireActions(p, body){
     body.querySelectorAll('.pa-btn[data-pa]').forEach(btn=>{
+      let _pendingReset=null;
+
       btn.addEventListener('click', async e=>{
         e.stopPropagation();
+        const action=btn.dataset.pa;
+
+        // Disconnect fires immediately — it's reversible (peer will reconnect)
+        if(action==='disconnect'){
+          btn.classList.add('pa-working');
+          try{
+            await this.rpc('disconnectnode',[p.addr||'']);
+            this._selectedId=null;
+            this.renderDetail(null);
+            setTimeout(()=>poller.fetchNow(),600);
+          }catch(_){
+            btn.classList.remove('pa-working');
+          }
+          return;
+        }
+
+        // Ban actions: require confirmation click within 3s
+        if(btn.dataset.confirm!=='pending'){
+          // First click — enter confirm state
+          clearTimeout(_pendingReset);
+          const origText=btn.textContent;
+          btn.dataset.origText=origText;
+          btn.dataset.confirm='pending';
+          btn.textContent='confirm?';
+          btn.style.opacity='1';
+          _pendingReset=setTimeout(()=>{
+            btn.dataset.confirm='';
+            btn.textContent=btn.dataset.origText||origText;
+            btn.style.opacity='';
+          },3000);
+          return;
+        }
+
+        // Second click — confirmed, fire the RPC
+        clearTimeout(_pendingReset);
+        btn.dataset.confirm='';
+        btn.textContent=btn.dataset.origText||btn.textContent;
+        btn.style.opacity='';
         btn.classList.add('pa-working');
         try{
-          const action=btn.dataset.pa;
-          if(action==='disconnect'){
-            await this.rpc('disconnectnode',[p.addr||'']);
+          const banAddr=(p.addr||'').replace(/:(\d+)$/,'').replace(/^\[(.+)\]$/,'$1');
+          if(action==='banperm'){
+            await this.rpc('setban',[banAddr,'add',253370764800,true]);
           } else {
-            const banAddr=(p.addr||'').replace(/:(\d+)$/,'').replace(/^\[(.+)\]$/,'$1');
-            if(action==='banperm'){
-              await this.rpc('setban',[banAddr,'add',253370764800,true]);
-            } else {
-              const dur={ban1h:3600,ban24h:86400,ban7d:604800,ban30d:2592000}[action];
-              await this.rpc('setban',[banAddr,'add',dur,false]);
-            }
+            const dur={ban1h:3600,ban24h:86400,ban7d:604800,ban30d:2592000}[action];
+            await this.rpc('setban',[banAddr,'add',dur,false]);
           }
           this._selectedId=null;
           this.renderDetail(null);
@@ -965,7 +1004,7 @@ const banList = {
       '<div class="ban-row">'
       +'<span class="ban-row-addr">'+esc(b.address||'')+'</span>'
       +'<span class="ban-row-exp">'+utils.fmtBanLeft(b)+'</span>'
-      +'<button class="pa-btn pa-unban" data-unban="'+esc(b.address||'')+'">unban</button>'
+      +'<button type="button" class="pa-btn pa-unban" data-unban="'+esc(b.address||'')+'">unban</button>'
       +'</div>'
     ).join('');
     rowsEl.querySelectorAll('.pa-btn[data-unban]').forEach(btn=>{
@@ -995,20 +1034,34 @@ const blocksPanel = {
 
   render(d){
     const blocks=d.blocks||[];
+    const ibd=d.blockchain?.initialblockdownload||false;
     const now=Date.now()/1000;
     this._cache=blocks;
     this._lastDeploymentInfo=d.deploymentInfo||{};
 
     set('blk-ph', blocks.length?'tip #'+fb(blocks[0].height):'—');
 
+    if(ibd&&!blocks.length){
+      document.getElementById('blk-body').innerHTML=
+        '<tr><td colspan="6" class="ibd-placeholder">block stats unavailable during initial sync</td></tr>';
+      return;
+    }
+
     document.getElementById('blk-body').innerHTML=blocks.map((b,i)=>{
         return `
       <tr class="${i===0?'new':''} ${b.height===this._selectedHeight?'peer-sel':''}" data-bheight="${b.height}">
         <td class="td-num"><a class="ext-link" href="${utils.mspaceUrl(b.hash,nodePanel.currentChain)}" target="_blank" rel="noopener noreferrer">${fb(b.height)}</a></td>
-        <td class="td-hash" style="white-space:nowrap;cursor:pointer" data-copy="${esc(b.hash||'')}"><em>${(b.hash||'').slice(0,4)}</em>${(b.hash||'').slice(4,8)}…${(b.hash||'').slice(-4)}</td>
+        <td class="td-hash td-hash-click" data-copy="${esc(b.hash||'')}"><span class="td-hash-prefix">${(b.hash||'').slice(0,4)}${(b.hash||'').slice(4,8)}…</span><em>${(b.hash||'').slice(-4)}</em></td>
         <td class="td-dim">${fb(b.txs)}</td>
-        <td class="td-inout">${b.ins||b.outs?fb(b.ins)+'<span style="color:var(--t4)">·</span>'+fb(b.outs):'—'}</td>
-        <td style="vertical-align:middle">${(()=>{const pct=b.weight?b.weight/4000000*100:0;const clr=pct>=85?'var(--grn)':pct>=60?'var(--pos)':pct>=30?'var(--orange)':'var(--neg)';return pct?`<div style="width:100%;height:2px;background:var(--raised);border-radius:2px;overflow:hidden"><div style="width:${Math.min(pct,100).toFixed(1)}%;height:100%;background:${clr};border-radius:2px;transition:width .9s cubic-bezier(.4,0,.2,1)"></div></div>`:'<div style="width:100%;height:2px;background:var(--raised);border-radius:2px"></div>';})()}</td>
+        <td class="td-inout">${b.ins||b.outs?fb(b.ins)+'<span class="v-sep">·</span>'+fb(b.outs):'—'}</td>
+        <td class="td-fill">${(()=>{
+          const pct=b.weight?b.weight/4000000*100:0;
+          const clr=pct>=85?'var(--grn)':pct>=50?'var(--orange)':pct>=20?'var(--pos)':'var(--t4)';
+          return `<div class="blk-fill-wrap">
+            <div class="blk-fill-track"><div class="blk-fill-bar" style="width:${Math.min(pct,100).toFixed(1)}%;background:${clr}"></div></div>
+            <span class="blk-fill-pct">${pct?pct.toFixed(0)+'%':'—'}</span>
+          </div>`;
+        })()}</td>
         <td class="td-dim">${b.time?utils.fmtAge(now-b.time):'—'}</td>
       </tr>`}).join('');
 
@@ -1078,12 +1131,12 @@ const blocksPanel = {
       <div class="kv"><span class="k">in · out</span><span class="v dim">${b.ins?fb(b.ins):'-'}<span class="v-pair-sep"> · </span>${b.outs?fb(b.outs):'-'}</span></div>
       <div class="kv"><span class="k">size · fill</span><span class="v dim">${utils.fmtBytes(b.size)}<span class="v-pair-sep"> · </span><span class="${fillCls}">${fillPct?f(fillPct,0)+'%':'—'}</span></span></div>
       <div class="kv"><span class="k">avg · total fee</span><span class="v"><span class="${avgFeeCls}">${avgfeeStr}</span><span class="v-pair-sep"> · </span><span class="o2">${b.totalfee?utils.fmtSats(b.totalfee):'—'}</span></span></div>
-      ${pctStr?`<div class="kv"><span class="k">fee pctiles</span><span class="v dim" style="font-size:9px">${pctStr}</span></div>`:''}
+      ${pctStr?`<div class="kv"><span class="k">fee pctiles</span><span class="v dim v-sm">${pctStr}</span></div>`:''}
       <div class="kv"><span class="k">subsidy · era</span><span class="v"><span class="o2">${b.subsidy!=null?f(b.subsidy/1e8,3):'—'}</span><span class="v-pair-sep"> · </span><span class="dim">${era}</span></span></div>
       <div class="kv"><span class="k">fee share</span><span class="v ${feeRatioCls}">${feeRatioStr}</span></div>
-      <div class="kv"><span class="k">signalling</span><span class="v ${sigCls}" style="word-break:break-all;white-space:normal;text-align:right;line-height:1.5">${sigStr}</span></div>
-      <div class="kv"><span class="k">version · bits</span><span class="v mono" style="font-size:8.5px">0x${(b.version>>>0).toString(16).padStart(8,'0')}<span class="v-pair-sep"> · </span>${b.bits?'0x'+esc(b.bits):'—'}</span></div>
-      <div class="kv"><span class="k">nonce</span><span class="v mono" style="font-size:9px;color:var(--t4)">${b.nonce!=null?fb(b.nonce):'—'}</span></div>
+      <div class="kv"><span class="k">signalling</span><span class="v ${sigCls} v-wrap">${sigStr}</span></div>
+      <div class="kv"><span class="k">version · bits</span><span class="v mono v-xs">0x${(b.version>>>0).toString(16).padStart(8,'0')}<span class="v-pair-sep"> · </span>${b.bits?'0x'+esc(b.bits):'—'}</span></div>
+      <div class="kv"><span class="k">nonce</span><span class="v mono v-sm dim">${b.nonce!=null?fb(b.nonce):'—'}</span></div>
       <div class="kv"><span class="k">median time</span><span class="v dim">${b.mediantime?utils.fmtTimestamp(b.mediantime):'—'}</span></div>`;
   },
 
@@ -1107,55 +1160,143 @@ const charts = {
 
   feeHeatmap: {
     _blocks: [],
-    _BUCKETS: [
-      {label:'1000+',min:1000,max:Infinity},
-      {label:'500',  min:500, max:1000},
-      {label:'200',  min:200, max:500},
-      {label:'100',  min:100, max:200},
-      {label:'50',   min:50,  max:100},
-      {label:'20',   min:20,  max:50},
-      {label:'10',   min:10,  max:20},
-      {label:'5',    min:5,   max:10},
-      {label:'2',    min:2,   max:5},
-      {label:'1',    min:1,   max:2},
-      {label:'<1',   min:0,   max:1},
-    ],
-    draw(blocks){ if(blocks?.length) this._blocks=blocks; this._render(this._blocks); },
-    _render(blocks){
-      const wrap=document.getElementById('fee-heatmap-wrap');
-      if(!wrap||!blocks||!blocks.length) return;
-      // Read accent colour once per render — avoids a style recalc on every cell
+    _panel: null,
+    draw(blocks){ if(blocks?.length) this._blocks=blocks; this._measure(); },
+    _measure(){
+      const panel=this._panel||(this._panel=document.getElementById('p-col2-heatmap'));
+      if(!panel) return;
+      const r=panel.getBoundingClientRect();
+      if(r.width<=10||r.height<=10) return;
+      const ph=panel.querySelector('.ph');
+      const phH=ph?ph.getBoundingClientRect().height:28;
+      this._render(this._blocks, r.width-24, Math.max(40, r.height-phH-16));
+    },
+    _render(blocks, W, H){
+      const canvas=document.getElementById('fee-ridge-canvas');
+      if(!canvas||!blocks||blocks.length<2) return;
+      const dpr=window.devicePixelRatio||1;
+      canvas.width=Math.round(W*dpr); canvas.height=Math.round(H*dpr);
+      canvas.style.width=W+'px'; canvas.style.height=H+'px';
+      const ctx=canvas.getContext('2d');
+      if(!ctx) return;
+      ctx.save(); ctx.scale(dpr,dpr); ctx.clearRect(0,0,W,H);
+
+      // ── FEE SWIMLANE CHART ───────────────────────────────────────────────────
+      // One row per block: p10→p90 whisker, p25→p75 filled bar, median tick.
+      // Newest block at top, log-scale x-axis. Age fades older rows.
       const rgb=(getComputedStyle(document.documentElement).getPropertyValue('--orange-rgb')||'240,112,32').trim();
-      const bChron=[...blocks].reverse();
-      const matrix=this._BUCKETS.map((bucket,bi)=>bChron.map(b=>{
+
+      // newest-first → draw top-to-bottom
+      const ordered=[...blocks].filter(b=>{
         const p=b.feePercentiles;
-        if(p&&p.length===5){
-          const [p10,p25,p50,p75,p90]=p;
-          if(p50>=bucket.min&&p50<bucket.max) return 1.0;
-          if(p75>bucket.min&&p25<bucket.max)  return 0.55;
-          if(p90>bucket.min&&p10<bucket.max)  return 0.18;
-          return 0;
+        return (p&&p.length>=5&&p[2]>0)||b.avgfeerate>0;
+      });
+      const N=ordered.length;
+      if(!N) return;
+
+      const LABEL_W=32, BOT_PAD=14, TOP_PAD=4, RIGHT_PAD=6;
+      const plotW=W-LABEL_W-RIGHT_PAD;
+      const LOG_MIN=Math.log10(0.5), LOG_MAX=Math.log10(1200);
+      const feeToX=fee=>LABEL_W+((Math.log10(Math.max(0.4,fee))-LOG_MIN)/(LOG_MAX-LOG_MIN))*plotW;
+      const floorX=feeToX(1);
+
+      const rowH=(H-BOT_PAD-TOP_PAD)/N;
+      const BAR_H=Math.max(3, Math.min(10, rowH*0.38));
+      const WHISKER_H=Math.max(2, BAR_H*0.5);
+
+      // ── Vertical grid lines
+      [1,2,5,10,20,50,100,200,500,1000].forEach(fee=>{
+        const x=feeToX(fee); if(x<LABEL_W||x>W-RIGHT_PAD) return;
+        const isMajor=(fee===1||fee===10||fee===100);
+        ctx.strokeStyle=`rgba(${rgb},${isMajor?0.10:0.04})`; ctx.lineWidth=1;
+        ctx.beginPath(); ctx.moveTo(x,TOP_PAD); ctx.lineTo(x,H-BOT_PAD); ctx.stroke();
+      });
+      // Relay floor
+      ctx.strokeStyle=`rgba(${rgb},0.22)`; ctx.lineWidth=1; ctx.setLineDash([2,4]);
+      ctx.beginPath(); ctx.moveTo(floorX,TOP_PAD); ctx.lineTo(floorX,H-BOT_PAD); ctx.stroke();
+      ctx.setLineDash([]);
+
+      // ── Rows (newest = index 0 = top)
+      ordered.forEach((b,i)=>{
+        const p=b.feePercentiles;
+        let p10,p25,p50,p75,p90;
+        if(p&&p.length>=5){ [p10,p25,p50,p75,p90]=p; }
+        else { const r=b.avgfeerate; p10=r*0.6;p25=r*0.8;p50=r;p75=r*1.2;p90=r*1.5; }
+        if(!p50||p50<0.01) return;
+
+        const isNewest=(i===0);
+        const ageAlpha=isNewest?1.0:Math.max(0.22, 1.0-(i/(N-1||1))*0.78);
+
+        const cy=TOP_PAD+i*rowH+rowH*0.5; // vertical centre of row
+
+        // whisker line: p10 → p90
+        const x10=feeToX(p10), x90=feeToX(p90);
+        const x25=feeToX(p25), x75=feeToX(p75);
+        const x50=feeToX(p50);
+
+        // whisker
+        ctx.strokeStyle=`rgba(${rgb},${(ageAlpha*0.35).toFixed(2)})`; ctx.lineWidth=1;
+        ctx.beginPath(); ctx.moveTo(x10,cy); ctx.lineTo(x90,cy); ctx.stroke();
+        // whisker end caps
+        ctx.beginPath();
+        ctx.moveTo(x10,cy-WHISKER_H/2); ctx.lineTo(x10,cy+WHISKER_H/2);
+        ctx.moveTo(x90,cy-WHISKER_H/2); ctx.lineTo(x90,cy+WHISKER_H/2);
+        ctx.strokeStyle=`rgba(${rgb},${(ageAlpha*0.45).toFixed(2)})`; ctx.stroke();
+
+        // IQR bar: p25 → p75
+        const barGrad=ctx.createLinearGradient(x25,0,x75,0);
+        barGrad.addColorStop(0,   `rgba(${rgb},${(ageAlpha*0.18).toFixed(2)})`);
+        barGrad.addColorStop(0.4, `rgba(${rgb},${(ageAlpha*0.52).toFixed(2)})`);
+        barGrad.addColorStop(0.6, `rgba(${rgb},${(ageAlpha*0.52).toFixed(2)})`);
+        barGrad.addColorStop(1,   `rgba(${rgb},${(ageAlpha*0.18).toFixed(2)})`);
+        ctx.fillStyle=barGrad;
+        const bx=Math.min(x25,x75), bw=Math.max(2,Math.abs(x75-x25));
+        ctx.fillRect(bx, cy-BAR_H/2, bw, BAR_H);
+
+        // Bar outline
+        ctx.strokeStyle=`rgba(${rgb},${(ageAlpha*0.30).toFixed(2)})`; ctx.lineWidth=0.5;
+        ctx.strokeRect(bx+0.5, cy-BAR_H/2+0.5, bw-1, BAR_H-1);
+
+        // Median tick — bright vertical line through bar
+        const tickH=BAR_H+4;
+        ctx.strokeStyle=`rgba(${rgb},${(ageAlpha*(isNewest?1.0:0.75)).toFixed(2)})`;
+        ctx.lineWidth=isNewest?2:1.5;
+        ctx.beginPath(); ctx.moveTo(x50,cy-tickH/2); ctx.lineTo(x50,cy+tickH/2); ctx.stroke();
+
+        // Newest block: glow behind median tick
+        if(isNewest){
+          ctx.shadowColor=`rgba(${rgb},0.6)`; ctx.shadowBlur=6;
+          ctx.strokeStyle=`rgba(${rgb},1)`; ctx.lineWidth=2;
+          ctx.beginPath(); ctx.moveTo(x50,cy-tickH/2); ctx.lineTo(x50,cy+tickH/2); ctx.stroke();
+          ctx.shadowBlur=0;
         }
-        const rate=b.avgfeerate||0;
-        if(!rate) return 0;
-        if(rate>=bucket.min&&rate<bucket.max) return 1.0;
-        const above=this._BUCKETS[bi-1],below=this._BUCKETS[bi+1];
-        if(above&&rate>=above.min&&rate<above.max) return 0.22;
-        if(below&&rate>=below.min&&rate<below.max)  return 0.22;
-        return 0;
-      }));
-      const colLabelHtml=`<div class="fh-col-labels">${bChron.map(b=>`<span class="fh-col-label">…${String(b.height).slice(-3)}</span>`).join('')}</div>`;
-      const rowHtml=this._BUCKETS.map((bucket,ri)=>{
-        const cells=matrix[ri].map(v=>{
-          const alpha=v===0?0.04:v>=0.9?0.82:v>=0.5?0.46:0.16;
-          return `<div class="fh-cell" style="background:rgba(${rgb},${alpha})"></div>`;
-        }).join('');
-        return `<div class="fh-row"><span class="fh-label">${bucket.label}</span><div class="fh-cells">${cells}</div></div>`;
-      }).join('');
-      wrap.innerHTML=colLabelHtml+rowHtml;
+
+        // Block height label — left of chart
+        ctx.font=`7px JetBrains Mono,monospace`; ctx.textAlign='right';
+        ctx.fillStyle=`rgba(${rgb},${(ageAlpha*(isNewest?0.80:0.38)).toFixed(2)})`;
+        if(b.height) ctx.fillText('…'+String(b.height).slice(-3), LABEL_W-3, cy+2.5);
+
+        // Median value label — just right of median tick, newest only
+        if(isNewest){
+          ctx.font='7px JetBrains Mono,monospace'; ctx.textAlign='left';
+          ctx.fillStyle=`rgba(${rgb},0.85)`;
+          const label=p50>=10?Math.round(p50)+'s':p50.toFixed(1)+'s';
+          ctx.fillText(label, x50+3, cy+2.5);
+        }
+      });
+
+      // ── X-axis labels
+      ctx.font='7px JetBrains Mono,monospace'; ctx.textAlign='center';
+      ctx.fillStyle=`rgba(${rgb},0.55)`; ctx.fillText('1',floorX,H-2);
+      [2,5,10,20,50,100,200,500,1000].forEach(fee=>{
+        const x=feeToX(fee); if(x<floorX+8||x>W-RIGHT_PAD) return;
+        ctx.fillStyle=`rgba(${rgb},0.28)`; ctx.fillText(fee>=1000?'1k':String(fee),x,H-2);
+      });
+
+      ctx.restore();
       const hasPercentiles=blocks.some(b=>b.feePercentiles);
       const ph=document.getElementById('fh-ph');
-      if(ph) ph.textContent='last '+blocks.length+' blocks · sat/vB'+(hasPercentiles?' · p10–p90':' · avg');
+      if(ph) ph.textContent='last '+ordered.length+' blocks · sat/vB'+(hasPercentiles?' · p10–p90':' · avg');
     },
   },
 
@@ -1193,8 +1334,11 @@ const charts = {
       const minR=Math.min(...ratios);
       const pad=2, xStep=(W-pad*2)/(ratios.length-1);
       const yOf=r=>H-pad-(r/maxR)*(H-pad*2);
-      const grad=ctx.createLinearGradient(0,0,0,H);
-      grad.addColorStop(0,`rgba(${rgb},0.28)`); grad.addColorStop(1,`rgba(${rgb},0.03)`);
+      const peakY=Math.min(...ratios.map((_,i)=>yOf(ratios[i])));
+      const grad=ctx.createLinearGradient(0,peakY,0,H);
+      grad.addColorStop(0,`rgba(${rgb},0.28)`);
+      grad.addColorStop(0.55,`rgba(${rgb},0.10)`);
+      grad.addColorStop(1,`rgba(${rgb},0)`);
       ctx.beginPath(); ctx.moveTo(pad,yOf(ratios[0]));
       ratios.forEach((r,i)=>{ if(i>0) ctx.lineTo(pad+i*xStep,yOf(r)); });
       ctx.lineTo(pad+(ratios.length-1)*xStep,H); ctx.lineTo(pad,H); ctx.closePath();
@@ -1271,15 +1415,28 @@ const charts = {
         const x=pad+i*(bw+1), y=H-barH;
         if(current){
           // Current gap — hatched/dimmed to signal "in progress"
-          ctx.fillStyle=`rgba(${accentRgb},0.25)`;
+          ctx.fillStyle=`rgba(${accentRgb},0.20)`;
           ctx.fillRect(x,y,bw,barH);
-          ctx.strokeStyle=`rgba(${accentRgb},0.5)`;
-          ctx.lineWidth=1;
-          ctx.setLineDash([2,2]);
+          ctx.strokeStyle=`rgba(${accentRgb},0.45)`;
+          ctx.lineWidth=1; ctx.setLineDash([2,2]);
           ctx.strokeRect(x+0.5,y+0.5,bw-1,barH-1);
           ctx.setLineDash([]);
         } else {
-          ctx.fillStyle=g<=avgG*1.4?'#3a6a48':g<=avgG*2?`rgba(${accentRgb},0.6)`:'#363636';
+          // Gradient fill per bar — top slightly brighter than base
+          const fast=g<=avgG*1.4;
+          const slow=g>avgG*2;
+          const barGrad=ctx.createLinearGradient(x,y,x,y+barH);
+          if(fast){
+            barGrad.addColorStop(0,'rgba(90,170,106,.75)');
+            barGrad.addColorStop(1,'rgba(90,170,106,.35)');
+          } else if(slow){
+            barGrad.addColorStop(0,'rgba(64,64,64,.6)');
+            barGrad.addColorStop(1,'rgba(40,40,40,.4)');
+          } else {
+            barGrad.addColorStop(0,`rgba(${accentRgb},0.65)`);
+            barGrad.addColorStop(1,`rgba(${accentRgb},0.30)`);
+          }
+          ctx.fillStyle=barGrad;
           ctx.fillRect(x,y,bw,barH);
         }
         const label=g>=10?Math.round(g)+'m':g.toFixed(1)+'m';
@@ -1359,7 +1516,7 @@ const layout = {
   _DEFAULT_RATIO: {
     'peers':0.30,'services':0.05,'banned':0.10,'peer-detail':0.55,
     'blocks':0.35,'block-detail':0.35,'mining':0.30,
-    'chain':0.35,'fee-heatmap':0.20,'block-timing':0.28,'fee-subsidy':0.17,
+    'chain':0.35,'fee-distribution':0.20,'block-timing':0.28,'fee-subsidy':0.17,
   },
 
   // Design-default column width ratios (fraction of #main width).
@@ -1631,32 +1788,37 @@ const layout = {
     bar.addEventListener('mousedown', e => {
       e.preventDefault(); e.stopPropagation();
       const MIN_H = this._MIN_H;
-      // Walk forward to find the next VISIBLE panel. Hidden panels (display:none)
-      // have offsetHeight 0 which collapses the resize budget to nothing,
-      // causing the snap-up bug on every drag.
       let bot = bar.nextElementSibling;
       while(bot && (!bot.classList.contains('panel') || bot.style.display === 'none')) bot = bot.nextElementSibling;
-      if(!bot || !bot.offsetHeight) return; // no valid bottom panel — bail
-      const y0  = e.clientY;
-      const h0  = topPanel.offsetHeight;
-      const bh0 = bot ? bot.offsetHeight : 0;
-      // Total budget shared between the two panels around this bar.
+      if(!bot || !bot.offsetHeight) return;
+      const y0     = e.clientY;
+      const h0     = topPanel.offsetHeight;
+      const bh0    = bot.offsetHeight;
       const budget = h0 + bh0;
-      const col = topPanel.closest('.col-wrap');
-      bar.classList.add('dragging'); document.body.style.cursor = 'row-resize';
+      const col    = topPanel.closest('.col-wrap');
+      bar.classList.add('dragging');
+      document.body.style.cursor = 'row-resize';
+      // Suppress transition during drag so panels track cursor precisely
+      topPanel.classList.add('resizing');
+      bot.classList.add('resizing');
       const mv = ev => {
         const dy     = ev.clientY - y0;
         const newTop = Math.min(Math.max(MIN_H, h0 + dy), budget - MIN_H);
         topPanel.style.height = newTop + 'px';
-        if(bot) bot.style.height = Math.max(MIN_H, budget - newTop) + 'px';
+        bot.style.height      = (budget - newTop) + 'px';
       };
       const up = () => {
-        bar.classList.remove('dragging'); document.body.style.cursor = '';
+        bar.classList.remove('dragging');
+        document.body.style.cursor = '';
+        // Re-enable transition so the final settle animates
+        topPanel.classList.remove('resizing');
+        bot.classList.remove('resizing');
         document.removeEventListener('mousemove', mv);
         document.removeEventListener('mouseup', up);
         if(col) this._captureRatios(col);
       };
-      document.addEventListener('mousemove', mv); document.addEventListener('mouseup', up);
+      document.addEventListener('mousemove', mv);
+      document.addEventListener('mouseup', up);
     });
   },
 
@@ -1683,9 +1845,18 @@ const layout = {
     const wrap=document.getElementById('sb-hidden-wrap');
     if(!wrap) return;
     if(this._hiddenPanels.size===0){ wrap.innerHTML=''; return; }
-    wrap.innerHTML=Array.from(this._hiddenPanels.keys()).map(p=>
-      `<span class="sb-hidden-pill" data-restore="${p.dataset.panel||'panel'}">+ ${p.dataset.panel||'panel'}</span>`
-    ).join('');
+    // Human-readable labels for panel pills — data-panel values are internal identifiers
+    const PANEL_LABELS={
+      'node':'node','chain':'chain','network':'network',
+      'blocks':'blocks','block-detail':'block detail','mining':'mining',
+      'fee-distribution':'fee distribution','fee-subsidy':'fee / subsidy','block-timing':'block timing',
+      'peers':'peers','banned':'banned','services':'services','peer-detail':'peer detail',
+    };
+    wrap.innerHTML=Array.from(this._hiddenPanels.keys()).map(p=>{
+      const key=p.dataset.panel||'panel';
+      const label=PANEL_LABELS[key]||key;
+      return `<span class="sb-hidden-pill" data-restore="${key}">+ ${label}</span>`;
+    }).join('');
     wrap.querySelectorAll('.sb-hidden-pill').forEach(pill=>{
       pill.addEventListener('click',()=>{
         const panel=document.querySelector(`.panel[data-panel="${pill.dataset.restore}"]`);
@@ -1790,6 +1961,58 @@ const contextMenu = {
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// HERO STRIP — block height · next-block fee · mempool · peers
+// ═══════════════════════════════════════════════════════════════════════════════
+const heroStrip = {
+
+  _setVal(id, val){
+    const el=document.getElementById(id);
+    if(!el) return;
+    const s=String(val);
+    if(el.textContent===s) return;
+    el.textContent=s;
+    el.classList.remove('hero-flash');
+    void el.offsetWidth; // reflow to restart animation
+    el.classList.add('hero-flash');
+  },
+
+  render(d){
+    const bc  = d.blockchain||{};
+    const ni  = d.networkInfo||{};
+    const mi  = d.mempoolInfo||{};
+    const fees= d.fees||{};
+    const blocks = d.blocks||[];
+    const now = Date.now()/1000;
+
+    // Block height + tip age
+    this._setVal('hero-height', fb(bc.blocks||0));
+    const tipTime = blocks.length ? blocks[0].time : 0;
+    const ageEl = document.getElementById('hero-tip-age');
+    if(ageEl) ageEl.textContent = tipTime ? utils.fmtAgeAgo(now-tipTime) : '—';
+
+    // Next-block fee (1-block estimate, already in sat/vB from server)
+    this._setVal('hero-fee', fees.fast!=null ? String(fees.fast) : '—');
+
+    // Mempool tx count + size
+    this._setVal('hero-mempool', fb(mi.size||0));
+    const mpSub = document.getElementById('hero-mempool-sub');
+    if(mpSub) mpSub.textContent = mi.bytes
+      ? utils.fmtBytes(mi.bytes)+' · '+f((mi.mempoolminfee||0)*1e5,1)+' min'
+      : '—';
+
+    // Peers + in/out split
+    this._setVal('hero-peers', ni.connections||0);
+    const pSub = document.getElementById('hero-peers-sub');
+    if(pSub){
+      const cin  = ni.connections_in  != null ? ni.connections_in  : null;
+      const cout = ni.connections_out != null ? ni.connections_out : null;
+      pSub.textContent = (cin!=null&&cout!=null) ? cin+'↓  '+cout+'↑' : '—';
+    }
+  },
+};
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // POLLER — fetch, rate state, retry countdown, polling schedule
 // ═══════════════════════════════════════════════════════════════════════════════
 const poller = {
@@ -1887,6 +2110,15 @@ const poller = {
   setSync(syncing){ this._lastSync=syncing; },
   getLastFetchAt(){ return this._lastFetchAt; },
 
+  // C2: Encapsulated pause/resume — callers must not touch _pollTimer directly
+  pause(){
+    clearInterval(this._pollTimer);
+    this._pollTimer=null;
+  },
+  resume(){
+    this.fetchNow().then(()=>this.schedule());
+  },
+
   exportJSON(){
     if(!this._lastData) return;
     const ts=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
@@ -1907,9 +2139,12 @@ function safeRender(name, fn){
   catch(e){ console.error('[render:'+name+']', e.message, e.stack); }
 }
 
+let _firstRender = true; // C1: module-scoped flag, not a function property
+
 function renderAll(d){
   poller.setSync(d.blockchain?.initialblockdownload||false);
 
+  safeRender('hero',         ()=> heroStrip.render(d));
   safeRender('node',        ()=> nodePanel.render(d));
   safeRender('chain',       ()=> chainPanel.render(d));
   safeRender('network',     ()=> network.render(d.netIn, d.netOut, d.totalRecv, d.totalSent));
@@ -1918,16 +2153,71 @@ function renderAll(d){
   safeRender('feeHeatmap',  ()=> charts.feeHeatmap.draw(d.blocks||[]));
   safeRender('feeSubsidy',  ()=> charts.feeSubsidy.draw(d.blocks||[]));
   safeRender('blockTiming', ()=> charts.blockTiming.draw(d.blocks||[]));
+
+  // Strip shimmer on first successful render
+  if(_firstRender){
+    _firstRender = false;
+    document.querySelectorAll('.loading').forEach(el=>el.classList.remove('loading'));
+  }
 }
 
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CHAIN THEME — apply html class + favicon + title from chain name.
+// Called on every successful render AND restored from localStorage at boot
+// so the overlay always shows in the correct chain colour even before first fetch.
+// ═══════════════════════════════════════════════════════════════════════════════
+const chainTheme = {
+  apply(chain, blockHeight){
+    const chainNameMap={'testnet4':'testnet4','signet':'signet','regtest':'regtest'};
+    const chainClass='chain-'+(chainNameMap[chain]||chain||'main');
+    document.documentElement.className=chain&&chain!=='main'?chainClass:'';
+
+    const faviconColors={'testnet4':'#3a8fd4','signet':'#c8a820','regtest':'#9a5cc8','test':'#3a8fd4'};
+    const fColor=faviconColors[chain]||'#f07020';
+    const fSvg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect width="16" height="16" rx="3" fill="${fColor}"/></svg>`;
+    const fEl=document.querySelector('link[rel="icon"]')||Object.assign(document.createElement('link'),{rel:'icon'});
+    fEl.type='image/svg+xml';
+    fEl.href='data:image/svg+xml,'+encodeURIComponent(fSvg);
+    if(!fEl.parentNode) document.head.appendChild(fEl);
+
+    const chainLabel=chain&&chain!=='main'?' · '+chain:'';
+    if(blockHeight) document.title='#'+fb(blockHeight)+chainLabel+' · blockwatch';
+    else if(chainLabel) document.title='blockwatch'+chainLabel;
+
+    // Persist so the next page load can restore theme before first fetch
+    try{ localStorage.setItem('bw-chain', chain||'main'); }catch(_){}
+  },
+};
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // BOOT — wire events, init modules, start polling
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// Restore last known chain theme immediately — before overlay shows,
+// before any fetch completes, so the connecting screen is always themed correctly
+try{
+  const savedChain=localStorage.getItem('bw-chain');
+  if(savedChain&&savedChain!=='main') chainTheme.apply(savedChain);
+}catch(_){}
+
 // Layout
 layout.init();
+
+// Shimmer skeleton — mark hero values and KV values as loading until first data
+(function applyLoadingState(){
+  const heroIds = ['hero-height','hero-fee','hero-mempool','hero-peers'];
+  heroIds.forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.classList.add('loading');
+  });
+  // Mark all KV .v spans that currently show — (empty, will be replaced on render)
+  document.querySelectorAll('.pb .v:not(.v-pair)').forEach(el=>{
+    el.classList.add('loading');
+  });
+})();
 
 // Charts resize observers
 charts.init();
@@ -2003,9 +2293,9 @@ setInterval(()=>{
 // Tab visibility — pause polling when hidden, resume on return
 document.addEventListener('visibilitychange',()=>{
   if(document.hidden){
-    clearInterval(poller._pollTimer); poller._pollTimer=null;
+    poller.pause();
   } else {
-    poller.fetchNow().then(()=>poller.schedule());
+    poller.resume();
   }
 });
 

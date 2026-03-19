@@ -123,7 +123,9 @@ const W=process.stdout.columns||72;
 function row(label,value,col=A.t2){process.stdout.write('  '+c(A.t3,(label+':').padEnd(15))+'  '+c(col,value)+'\n');}
 
 function printBanner(){
-  const bar=c(A.t4,'-'.repeat(Math.min(W-4,38)));
+  const contentWidth=15+2+20; // label col + spacer + value col — matches row() layout
+  const barLen=Math.min(Math.max(contentWidth, W-4), 56);
+  const bar=c(A.t4,'-'.repeat(barLen));
   process.stdout.write('\n');
   process.stdout.write('  '+c(A.t1,'BLOCKWATCH')+'\n');
   process.stdout.write('  '+bar+'\n');
@@ -276,6 +278,12 @@ async function _doFetchAll(){
 
 // Rate limit /api/data to 5 requests/sec — protects bitcoind from tight loops.
 // Uses a simple token bucket: refills 5 tokens/sec, max burst of 5.
+// NOTE: this is a GLOBAL limit across all clients, not per-IP. A single browser
+// tab polls every 10–30s so the limit is never approached in normal use. With
+// multiple tabs open, each tab polls independently but the server deduplicates
+// in-flight fetches — only one RPC batch fires regardless of tab count, and all
+// tabs share that result. The rate limit is a last-resort guard against tight
+// polling loops (e.g. a script hammering /api/data), not a per-user quota.
 const _rl={tokens:5,last:Date.now(),rate:5,max:5};
 function rateLimitOk(){
   const now=Date.now();
