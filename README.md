@@ -4,9 +4,7 @@ A real-time Bitcoin node dashboard. Connects directly to your local Bitcoin Core
 
 No dependencies beyond Node.js. No external APIs. Your node, your data.
 
-![blockwatch — live demo](demo.gif)
-
-> A 10–15 second recording showing a block arriving, mempool updating, and peers refreshing. To record your own: run blockwatch against mainnet, use [LICEcap](https://www.cockos.com/licecap/) (Windows/macOS) or `peek` (Linux) to capture the browser at ~1280px wide, and save as `demo.gif` in the repo root.
+![blockwatch](screenshot-mainnet.png)
 
 ---
 
