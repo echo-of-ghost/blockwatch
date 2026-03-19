@@ -35,7 +35,6 @@ No dependencies beyond Node.js. No external APIs. Your node, your data.
 |---|---|---|---|
 | ![mainnet](screenshot-mainnet.png) | ![testnet4](screenshot-testnet4.png) | ![signet](screenshot-signet.png) | ![regtest](screenshot-regtest.png) |
 
-> To add your own: run blockwatch against each network, take a full-browser screenshot at your preferred width, and save as `screenshot-mainnet.png`, `screenshot-testnet4.png`, `screenshot-signet.png`, and `screenshot-regtest.png` in the repo root.
 
 ---
 
