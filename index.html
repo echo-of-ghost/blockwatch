@@ -8,8 +8,8 @@
 <meta name="description" content="blockwatch — real-time Bitcoin node dashboard">
 <meta name="theme-color" content="#0e0e0e">
 <title>blockwatch</title>
-<!-- JetBrains Mono: load from Google Fonts (swap for self-hosted woff2 to remove external dependency) -->
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+<!-- Inter: UI chrome. JetBrains Mono: data values. -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="blockwatch.css">
 </head>
 <body>
@@ -25,16 +25,35 @@
     <span class="tb-sep">·</span>
     <span class="tb-dim" id="tb-uptime" style="display:none"></span>
     <span class="tb-sep" id="tb-uptime-sep" style="display:none">·</span>
-    <span id="tb-ibd-label" class="tb-warn" style="display:none">IBD</span>
     <span class="tb-sync-badge" id="tb-sync" style="display:none"></span>
   </div>
   <div class="tr">
     <span class="tb-height-main" id="tb-height" aria-live="polite" aria-label="Block height">—</span>
     <span class="tb-sep">·</span>
-    <span class="tb-dim" id="clock">—</span><span class="tb-dim" style="margin-left:3px;color:var(--t4);font-size:9px">UTC</span>
+    <span class="tb-dim" id="clock">—</span><span class="tb-utc">UTC</span>
     <span class="tb-sep">·</span>
-    <button id="snapshot-btn" class="ph-tsv-btn snapshot-btn" aria-label="Download JSON snapshot">snapshot ↓</button>
+    <button type="button" id="snapshot-btn" class="ph-tsv-btn snapshot-btn" aria-label="Download JSON snapshot">snapshot ↓</button>
     <span class="dot" id="live-dot" role="status" aria-label="Connection status"></span>
+  </div>
+</div>
+
+<!-- HERO STRIP -->
+<div id="hero" role="region" aria-label="Node summary">
+  <div class="hero-cell">
+    <div class="hero-val" id="hero-height">—</div>
+    <div class="hero-foot"><span class="hero-lbl">block height</span><span class="hero-sub" id="hero-tip-age">—</span></div>
+  </div>
+  <div class="hero-cell">
+    <div class="hero-val" id="hero-fee">—</div>
+    <div class="hero-foot"><span class="hero-lbl">next block fee</span><span class="hero-sub">sat / vB</span></div>
+  </div>
+  <div class="hero-cell">
+    <div class="hero-val" id="hero-mempool">—</div>
+    <div class="hero-foot"><span class="hero-lbl">mempool</span><span class="hero-sub" id="hero-mempool-sub">—</span></div>
+  </div>
+  <div class="hero-cell">
+    <div class="hero-val" id="hero-peers">—</div>
+    <div class="hero-foot"><span class="hero-lbl">peers</span><span class="hero-sub" id="hero-peers-sub">—</span></div>
   </div>
 </div>
 
@@ -44,7 +63,7 @@
   <!-- COL 1: NODE -->
   <div class="col-wrap resizable" id="col1">
     <div class="panel" data-panel="node">
-      <div class="ph"><span class="ph-drag">⠿</span><span class="ph-title">node</span><span class="ph-sep">|</span><span class="ph-meta" id="ni-net">—</span><button class="ph-close">×</button></div>
+      <div class="ph"><svg class="ph-drag-icon" viewBox="0 0 6 10" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="1.5" cy="1.5" r="1" fill="currentColor"/><circle cx="4.5" cy="1.5" r="1" fill="currentColor"/><circle cx="1.5" cy="5" r="1" fill="currentColor"/><circle cx="4.5" cy="5" r="1" fill="currentColor"/><circle cx="1.5" cy="8.5" r="1" fill="currentColor"/><circle cx="4.5" cy="8.5" r="1" fill="currentColor"/></svg><span class="ph-title">node</span><span class="ph-sep">|</span><span class="ph-meta" id="ni-net">—</span><button type="button" class="ph-close" aria-label="Close node panel">×</button></div>
       <div class="pb">
 
         <div class="sec">chain</div>
@@ -54,10 +73,10 @@
         <div class="kv"><span class="k">tip age</span><span class="v" id="ni-ta">—</span></div>
         <div class="kv"><span class="k">median time</span><span class="v dim" id="ni-mt">—</span></div>
         <div class="kv"><span class="k">chain tips</span><span class="v" id="ni-tips">—</span></div>
-        <div id="ibd-section" style="display:none">
-          <div class="kv"><span class="k">IBD</span><span class="v" id="ni-ibd">—</span></div>
-          <div class="ibd-track"><div class="ibd-fill" id="ibd-fill" style="width:0%"></div></div>
-          <div class="ibd-eta" id="ibd-eta">—</div>
+        <div id="sync-section" style="display:none">
+          <div class="kv"><span class="k">SYNC</span><span class="v" id="ni-sync-status">—</span></div>
+          <div class="sync-track"><div class="sync-fill" id="sync-fill" style="width:0%"></div></div>
+          <div class="sync-eta" id="sync-eta">—</div>
         </div>
 
         <div class="sec">mempool</div>
@@ -71,7 +90,7 @@
         <div class="sec">network</div>
         <div class="kv"><span class="k">connections</span><span class="v v-pair"><span class="dim" id="ni-conn">—</span><span class="v-pair-sep">·</span><span class="dim" id="ni-conn-split">—</span></span></div>
         <div class="kv"><span class="k">relay fee</span><span class="v dim" id="ni-rf">—</span></div>
-        <div id="ni-reachability"><span style="font-size:9px;color:var(--t4);padding:2px 0;display:block">—</span></div>
+        <div id="ni-reachability"><span class="ni-placeholder">—</span></div>
 
         <div class="sec">config</div>
         <div class="kv"><span class="k">chain size</span><span class="v v-pair"><span id="ni-sz">—</span><span class="v-pair-sep">·</span><span class="dim" id="ni-pr">—</span></span></div>
@@ -80,11 +99,11 @@
         <div class="kv"><span class="k dim">protocol</span><span class="v dim" id="ni-pv">—</span></div>
         <div class="kv"><span class="k dim">rpc</span><span class="v mono" id="ni-rpc">—</span></div>
 
-        <div class="sec" style="display:flex;align-items:center;justify-content:space-between;gap:6px">
+        <div class="sec sec-row">
           <span>reachable addresses</span>
-          <button class="la-toggle" id="la-reveal-btn" aria-label="Toggle local address visibility">reveal</button>
+          <button type="button" class="la-toggle" id="la-reveal-btn" aria-label="Toggle local address visibility">reveal</button>
         </div>
-        <div id="ni-localaddrs"><span style="font-size:9px;color:var(--t4);padding:2px 0;display:block">—</span></div>
+        <div id="ni-localaddrs"><span class="ni-placeholder">—</span></div>
       </div>
     </div>
     <div class="rhandle" data-target="col1"></div>
@@ -93,7 +112,7 @@
   <!-- COL 2: CHAIN + FEES -->
   <div class="col-wrap resizable" id="col2">
     <div class="panel" id="p-col2-top" data-panel="chain">
-      <div class="ph"><span class="ph-drag">⠿</span><span class="ph-title">chain</span><span class="ph-sep">|</span><span class="ph-meta" id="ch-tip-age">—</span><button class="ph-close">×</button></div>
+      <div class="ph"><svg class="ph-drag-icon" viewBox="0 0 6 10" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="1.5" cy="1.5" r="1" fill="currentColor"/><circle cx="4.5" cy="1.5" r="1" fill="currentColor"/><circle cx="1.5" cy="5" r="1" fill="currentColor"/><circle cx="4.5" cy="5" r="1" fill="currentColor"/><circle cx="1.5" cy="8.5" r="1" fill="currentColor"/><circle cx="4.5" cy="8.5" r="1" fill="currentColor"/></svg><span class="ph-title">chain</span><span class="ph-sep">|</span><span class="ph-meta" id="ch-tip-age">—</span><button type="button" class="ph-close" aria-label="Close chain panel">×</button></div>
       <div class="pb">
         <div class="sec">bandwidth</div>
         <div class="bw-group">
@@ -109,9 +128,9 @@
           </div>
         </div>
         <canvas id="spark" height="48" style="width:100%;margin-bottom:3px"></canvas>
-        <div style="display:flex;justify-content:flex-end;gap:10px;margin-bottom:4px">
-          <span style="font-size:7.5px;color:rgba(240,112,32,.7);display:flex;align-items:center;gap:3px"><span style="display:inline-block;width:10px;height:1.5px;background:rgba(240,112,32,.8);border-radius:1px;vertical-align:middle"></span>recv</span>
-          <span style="font-size:7.5px;color:rgba(196,137,74,.7);display:flex;align-items:center;gap:3px"><span style="display:inline-block;width:10px;height:1.5px;background:rgba(196,137,74,.75);border-radius:1px;vertical-align:middle"></span>sent</span>
+        <div class="spark-legend">
+          <span class="spark-legend-item spark-legend-recv">recv</span>
+          <span class="spark-legend-item spark-legend-sent">sent</span>
         </div>
         <div class="kv"><span class="k">recv total</span><span class="v dim" id="bw-rv">—</span></div>
         <div class="kv"><span class="k">sent total</span><span class="v dim" id="bw-sn">—</span></div>
@@ -121,20 +140,15 @@
 
       </div>
     </div>
-    <div class="panel" id="p-col2-heatmap" data-panel="fee-heatmap">
-      <div class="ph"><span class="ph-drag">⠿</span><span class="ph-title">fee heatmap</span><span class="ph-sep">|</span><span class="ph-meta" id="fh-ph">last 12 blocks</span><button class="ph-close">×</button></div>
-      <div class="pb" style="padding:6px 13px 8px 6px">
-        <div id="fee-heatmap-wrap"></div>
-        <div style="display:flex;align-items:center;gap:5px;margin-top:4px;justify-content:flex-end">
-          <span style="font-size:7.5px;color:var(--t4)">sparse</span>
-          <div style="width:44px;height:3px;border-radius:1px;background:linear-gradient(to right,rgba(var(--orange-rgb,240,112,32),.06),rgba(var(--orange-rgb,240,112,32),.85))"></div>
-          <span style="font-size:7.5px;color:var(--orange)">dense</span>
-        </div>
+    <div class="panel" id="p-col2-heatmap" data-panel="fee-distribution">
+      <div class="ph"><svg class="ph-drag-icon" viewBox="0 0 6 10" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="1.5" cy="1.5" r="1" fill="currentColor"/><circle cx="4.5" cy="1.5" r="1" fill="currentColor"/><circle cx="1.5" cy="5" r="1" fill="currentColor"/><circle cx="4.5" cy="5" r="1" fill="currentColor"/><circle cx="1.5" cy="8.5" r="1" fill="currentColor"/><circle cx="4.5" cy="8.5" r="1" fill="currentColor"/></svg><span class="ph-title">fee distribution</span><span class="ph-sep">|</span><span class="ph-meta" id="fh-ph">last 12 blocks</span><button type="button" class="ph-close" aria-label="Close fee distribution panel">×</button></div>
+      <div class="pb pb-chart">
+        <canvas id="fee-ridge-canvas" style="width:100%;display:block"></canvas>
       </div>
     </div>
     <div class="panel" id="p-col2-subsidy" data-panel="fee-subsidy">
-      <div class="ph"><span class="ph-drag">⠿</span><span class="ph-title">fee / subsidy</span><span class="ph-sep">|</span><span class="ph-meta" id="fs-ph">mining revenue mix</span><button class="ph-close">×</button></div>
-      <div class="pb" style="padding:6px 13px 8px">
+      <div class="ph"><svg class="ph-drag-icon" viewBox="0 0 6 10" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="1.5" cy="1.5" r="1" fill="currentColor"/><circle cx="4.5" cy="1.5" r="1" fill="currentColor"/><circle cx="1.5" cy="5" r="1" fill="currentColor"/><circle cx="4.5" cy="5" r="1" fill="currentColor"/><circle cx="1.5" cy="8.5" r="1" fill="currentColor"/><circle cx="4.5" cy="8.5" r="1" fill="currentColor"/></svg><span class="ph-title">fee / subsidy</span><span class="ph-sep">|</span><span class="ph-meta" id="fs-ph">mining revenue mix</span><button type="button" class="ph-close" aria-label="Close fee/subsidy panel">×</button></div>
+      <div class="pb pb-chart">
         <canvas id="fs-canvas" style="width:100%;display:block"></canvas>
         <div class="chart-leg">
           <span class="chart-leg-min" id="fs-min">—</span>
@@ -144,8 +158,8 @@
       </div>
     </div>
     <div class="panel" id="p-col2-mid" data-panel="block-timing">
-      <div class="ph"><span class="ph-drag">⠿</span><span class="ph-title">block timing</span><span class="ph-sep">|</span><span class="ph-meta" id="bt-ph">last 12</span><button class="ph-close">×</button></div>
-      <div class="pb" style="padding:6px 13px 8px">
+      <div class="ph"><svg class="ph-drag-icon" viewBox="0 0 6 10" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="1.5" cy="1.5" r="1" fill="currentColor"/><circle cx="4.5" cy="1.5" r="1" fill="currentColor"/><circle cx="1.5" cy="5" r="1" fill="currentColor"/><circle cx="4.5" cy="5" r="1" fill="currentColor"/><circle cx="1.5" cy="8.5" r="1" fill="currentColor"/><circle cx="4.5" cy="8.5" r="1" fill="currentColor"/></svg><span class="ph-title">block timing</span><span class="ph-sep">|</span><span class="ph-meta" id="bt-ph">last 12</span><button type="button" class="ph-close" aria-label="Close block timing panel">×</button></div>
+      <div class="pb pb-chart">
         <canvas id="bt-canvas" style="width:100%;display:block"></canvas>
         <div class="chart-leg">
           <span class="chart-leg-min" id="bt-min">—</span>
@@ -160,7 +174,7 @@
   <!-- COL 3: BLOCKS + MEMPOOL -->
   <div class="col-wrap resizable" id="col3">
     <div class="panel" id="p-col3-top" data-panel="blocks">
-      <div class="ph"><span class="ph-drag">⠿</span><span class="ph-title">blocks</span><span class="ph-sep">|</span><span class="ph-meta" id="blk-ph">—</span><button class="ph-close">×</button></div>
+      <div class="ph"><svg class="ph-drag-icon" viewBox="0 0 6 10" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="1.5" cy="1.5" r="1" fill="currentColor"/><circle cx="4.5" cy="1.5" r="1" fill="currentColor"/><circle cx="1.5" cy="5" r="1" fill="currentColor"/><circle cx="4.5" cy="5" r="1" fill="currentColor"/><circle cx="1.5" cy="8.5" r="1" fill="currentColor"/><circle cx="4.5" cy="8.5" r="1" fill="currentColor"/></svg><span class="ph-title">blocks</span><span class="ph-sep">|</span><span class="ph-meta" id="blk-ph">—</span><button type="button" class="ph-close" aria-label="Close blocks panel">×</button></div>
       <div class="scroll-area">
         <table class="tbl" aria-label="Recent blocks">
           <thead><tr><th>#</th><th>hash</th><th>txs</th><th>in/out</th><th>fill</th><th>age</th></tr></thead>
@@ -169,7 +183,7 @@
       </div>
     </div>
     <div class="panel" id="p-col3-mid" data-panel="block-detail">
-      <div class="ph"><span class="ph-drag">⠿</span><span class="ph-title">block</span><span class="ph-sep">|</span><span class="ph-meta" id="bd-ph">latest</span><button class="ph-close">×</button></div>
+      <div class="ph"><svg class="ph-drag-icon" viewBox="0 0 6 10" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="1.5" cy="1.5" r="1" fill="currentColor"/><circle cx="4.5" cy="1.5" r="1" fill="currentColor"/><circle cx="1.5" cy="5" r="1" fill="currentColor"/><circle cx="4.5" cy="5" r="1" fill="currentColor"/><circle cx="1.5" cy="8.5" r="1" fill="currentColor"/><circle cx="4.5" cy="8.5" r="1" fill="currentColor"/></svg><span class="ph-title">block</span><span class="ph-sep">|</span><span class="ph-meta" id="bd-ph">latest</span><button type="button" class="ph-close" aria-label="Close block detail panel">×</button></div>
       <div class="pb" id="block-detail-body">
         <div class="kv"><span class="k">height</span><span class="v dim">—</span></div>
         <div class="kv"><span class="k">hash</span><span class="v dim">—</span></div>
@@ -185,7 +199,7 @@
       </div>
     </div>
     <div class="panel" id="p-col3-bot" data-panel="mining">
-      <div class="ph"><span class="ph-drag">⠿</span><span class="ph-title">mining</span><span class="ph-sep">|</span><span class="ph-meta" id="mn-ph">—</span><button class="ph-close">×</button></div>
+      <div class="ph"><svg class="ph-drag-icon" viewBox="0 0 6 10" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="1.5" cy="1.5" r="1" fill="currentColor"/><circle cx="4.5" cy="1.5" r="1" fill="currentColor"/><circle cx="1.5" cy="5" r="1" fill="currentColor"/><circle cx="4.5" cy="5" r="1" fill="currentColor"/><circle cx="1.5" cy="8.5" r="1" fill="currentColor"/><circle cx="4.5" cy="8.5" r="1" fill="currentColor"/></svg><span class="ph-title">mining</span><span class="ph-sep">|</span><span class="ph-meta" id="mn-ph">—</span><button type="button" class="ph-close" aria-label="Close mining panel">×</button></div>
       <div class="pb">
         <div class="kv"><span class="k">diff · hashrate</span><span class="v v-pair"><span class="dim" id="mn-df">—</span><span class="v-pair-sep">·</span><span class="o" id="mn-hr">—</span></span></div>
         <div class="kv"><span class="k dim">chainwork</span><span class="v mono v-copyable"><span id="mn-cw">—</span><span id="mn-cw-copy" data-copy="" class="copy-icon">⎘</span></span></div>
@@ -202,33 +216,33 @@
   <!-- COL 4: PEERS + SERVICES + BANNED + DETAIL -->
   <div class="col-wrap" id="col4">
     <div class="panel" id="p-col4-top" data-panel="peers">
-      <div class="ph"><span class="ph-drag">⠿</span><span class="ph-title">peers</span><span class="ph-sep">|</span><span class="ph-meta" id="peer-in-ph" style="flex:0 0 auto">—</span><span style="color:var(--t4);margin:0 4px;flex-shrink:0">·</span><span class="ph-meta" style="flex:0 0 auto" id="peer-out-ph">—</span><span class="ph-right"><button id="peers-tsv-btn" class="ph-tsv-btn" aria-label="Export peers as TSV">peers ↓</button><button class="ph-close">×</button></span></div>
+      <div class="ph"><svg class="ph-drag-icon" viewBox="0 0 6 10" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="1.5" cy="1.5" r="1" fill="currentColor"/><circle cx="4.5" cy="1.5" r="1" fill="currentColor"/><circle cx="1.5" cy="5" r="1" fill="currentColor"/><circle cx="4.5" cy="5" r="1" fill="currentColor"/><circle cx="1.5" cy="8.5" r="1" fill="currentColor"/><circle cx="4.5" cy="8.5" r="1" fill="currentColor"/></svg><span class="ph-title">peers</span><span class="ph-sep">|</span><span class="ph-meta ph-meta-fixed" id="peer-in-ph">—</span><span class="ph-meta-sep">·</span><span class="ph-meta ph-meta-fixed" id="peer-out-ph">—</span><span class="ph-right"><button type="button" id="peers-tsv-btn" class="ph-tsv-btn" aria-label="Export peers as TSV">peers ↓</button><button type="button" class="ph-close" aria-label="Close peers panel">×</button></span></div>
       <div class="scroll-area">
         <table class="tbl" id="peer-tbl" aria-label="Connected peers">
-          <thead><tr><th></th><th>address</th><th>net</th><th>version</th><th style="text-align:right">blks</th><th style="text-align:right">ping</th><th style="text-align:right">↑</th><th style="text-align:right">↓</th></tr></thead>
+          <thead><tr><th></th><th>address</th><th>net</th><th>version</th><th class="td-r">blks</th><th class="td-r">ping</th><th class="td-r">↑</th><th class="td-r">↓</th></tr></thead>
           <tbody id="peer-table-body"></tbody>
         </table>
       </div>
     </div>
     <div class="panel" id="p-col4-mid" data-panel="banned">
-      <div class="ph"><span class="ph-drag">⠿</span><span class="ph-title">banned</span><span class="ph-sep">|</span><span class="ph-meta" id="ban-ph">—</span><button class="ph-close">×</button></div>
+      <div class="ph"><svg class="ph-drag-icon" viewBox="0 0 6 10" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="1.5" cy="1.5" r="1" fill="currentColor"/><circle cx="4.5" cy="1.5" r="1" fill="currentColor"/><circle cx="1.5" cy="5" r="1" fill="currentColor"/><circle cx="4.5" cy="5" r="1" fill="currentColor"/><circle cx="1.5" cy="8.5" r="1" fill="currentColor"/><circle cx="4.5" cy="8.5" r="1" fill="currentColor"/></svg><span class="ph-title">banned</span><span class="ph-sep">|</span><span class="ph-meta" id="ban-ph">—</span><button type="button" class="ph-close" aria-label="Close banned panel">×</button></div>
       <div class="scroll-area pb" id="ban-rows">
         <div class="ban-empty">no bans</div>
       </div>
     </div>
     <div class="panel" id="p-col4-svc" data-panel="services">
-      <div class="ph"><span class="ph-drag">⠿</span><span class="ph-title">services</span><span class="ph-sep">|</span><span class="ph-meta" id="svc-ph">—</span><button class="ph-close">×</button></div>
+      <div class="ph"><svg class="ph-drag-icon" viewBox="0 0 6 10" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="1.5" cy="1.5" r="1" fill="currentColor"/><circle cx="4.5" cy="1.5" r="1" fill="currentColor"/><circle cx="1.5" cy="5" r="1" fill="currentColor"/><circle cx="4.5" cy="5" r="1" fill="currentColor"/><circle cx="1.5" cy="8.5" r="1" fill="currentColor"/><circle cx="4.5" cy="8.5" r="1" fill="currentColor"/></svg><span class="ph-title">services</span><span class="ph-sep">|</span><span class="ph-meta" id="svc-ph">—</span><button type="button" class="ph-close" aria-label="Close services panel">×</button></div>
       <div class="pb">
         <div class="svc-grid" id="svc-grid"></div>
       </div>
     </div>
     <div class="panel" id="p-col4-bot" data-panel="peer-detail">
-      <div class="ph"><span class="ph-drag">⠿</span><span class="ph-title">peer detail</span><span class="ph-sep">|</span><span class="ph-meta" id="pd-ph">—</span><button class="ph-close">×</button></div>
+      <div class="ph"><svg class="ph-drag-icon" viewBox="0 0 6 10" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="1.5" cy="1.5" r="1" fill="currentColor"/><circle cx="4.5" cy="1.5" r="1" fill="currentColor"/><circle cx="1.5" cy="5" r="1" fill="currentColor"/><circle cx="4.5" cy="5" r="1" fill="currentColor"/><circle cx="1.5" cy="8.5" r="1" fill="currentColor"/><circle cx="4.5" cy="8.5" r="1" fill="currentColor"/></svg><span class="ph-title">peer detail</span><span class="ph-sep">|</span><span class="ph-meta" id="pd-ph">—</span><button type="button" class="ph-close" aria-label="Close peer detail panel">×</button></div>
       <div class="pd-tabs" id="pd-tabs" role="tablist" aria-label="Peer detail sections">
-        <button class="pd-tab active" data-tab="conn" role="tab" aria-selected="true">conn</button>
-        <button class="pd-tab" data-tab="sync" role="tab" aria-selected="false">sync</button>
-        <button class="pd-tab" data-tab="bw" role="tab" aria-selected="false">bw</button>
-        <button class="pd-tab" data-tab="gossip" role="tab" aria-selected="false">gossip</button>
+        <button type="button" class="pd-tab active" data-tab="conn" role="tab" aria-selected="true">conn</button>
+        <button type="button" class="pd-tab" data-tab="sync" role="tab" aria-selected="false">sync</button>
+        <button type="button" class="pd-tab" data-tab="bw" role="tab" aria-selected="false">bw</button>
+        <button type="button" class="pd-tab" data-tab="gossip" role="tab" aria-selected="false">gossip</button>
       </div>
       <div class="pb" id="peer-detail-body">
         <div class="pd-empty">click a peer to inspect</div>
@@ -240,11 +254,14 @@
 
 <!-- CONNECTING -->
 <div id="connecting" role="alert" aria-live="assertive">
-  <div class="c-spin" role="status" aria-label="Loading"></div>
-  <span class="c-logo"><b></b>&nbsp;blockwatch</span>
-  <span class="c-msg" id="conn-msg">connecting to bitcoind…</span>
-  <span class="c-countdown" id="conn-countdown"></span>
-  <button class="c-retry" id="conn-retry" style="display:none" aria-label="Retry connection">retry now</button>
+  <div class="c-bg-grid" aria-hidden="true"></div>
+  <div class="c-inner">
+    <div class="c-logo-mark" aria-hidden="true"></div>
+    <span class="c-wordmark">blockwatch</span>
+    <span class="c-msg" id="conn-msg">connecting to bitcoind…</span>
+    <span class="c-countdown" id="conn-countdown"></span>
+    <button type="button" class="c-retry" id="conn-retry" style="display:none" aria-label="Retry connection">retry now</button>
+  </div>
 </div>
 
 <!-- NODE WARNINGS BANNER -->
