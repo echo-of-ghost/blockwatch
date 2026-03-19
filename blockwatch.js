@@ -205,12 +205,12 @@ const network = {
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// NODE MODULE — node panel, titlebar, mempool, retarget, IBD, services, local addrs
+// NODE MODULE — node panel, titlebar, mempool, retarget, sync, services, local addrs
 // ═══════════════════════════════════════════════════════════════════════════════
 const nodePanel = {
   _currentChain: 'main',
   _retargetHistory: [],
-  _ibdHistory: [],
+  _syncHistory: [],
   _localAddrsRevealed: false,
   _lastLocalAddrs: [],
 
@@ -237,7 +237,7 @@ const nodePanel = {
     this._renderLocalAddrs(ni.localaddresses||[]);
 
     if(bc.initialblockdownload){
-      this._updateIBD(bc.verificationprogress||0);
+      this._updateSync(bc.verificationprogress||0);
     }
   },
 
@@ -251,11 +251,9 @@ const nodePanel = {
     const syncEl=document.getElementById('tb-sync');
     if(syncEl){
       if(synced){
-        syncEl.textContent='synced'; syncEl.className='tb-sync-badge synced';
-      } else if(bc.initialblockdownload){
-        syncEl.textContent=pct.toFixed(2)+'%'; syncEl.className='tb-sync-badge ibd';
+        syncEl.textContent='Synced'; syncEl.className='tb-sync-badge synced';
       } else {
-        syncEl.textContent='syncing '+pct.toFixed(2)+'%'; syncEl.className='tb-sync-badge syncing';
+        syncEl.textContent='Syncing'; syncEl.className='tb-sync-badge syncing';
       }
       syncEl.style.display='';
     }
@@ -275,8 +273,6 @@ const nodePanel = {
     fEl.href='data:image/svg+xml,'+encodeURIComponent(fSvg);
     if(!fEl.parentNode) document.head.appendChild(fEl);
 
-    const ibdEl=document.getElementById('tb-ibd-label');
-    if(ibdEl) ibdEl.style.display=bc.initialblockdownload?'inline':'none';
     document.getElementById('live-dot').className='dot ok';
 
     // Update page title — visible in tab, history, task switcher, pinned tabs
@@ -317,7 +313,7 @@ const nodePanel = {
     set('ni-sync', synced?'100.0000%':pct.toFixed(4)+'%');
     set('ni-ta',   tipTime?utils.fmtAgeAgo(now-tipTime):'—');
     set('ni-mt',   bc.mediantime?utils.fmtTimestamp(bc.mediantime):'—');
-    set('ni-ibd',  bc.initialblockdownload?'active':'complete');
+    set('ni-sync',  bc.initialblockdownload?'active':'complete');
     set('ni-pv',   ni.protocolversion!=null?String(ni.protocolversion):'—');
     set('ni-conn', ni.connections!=null?(ni.connections+(ni.maxconnections?(' / '+ni.maxconnections):'')):'—');
     // in/out split — shown as e.g. '8↓ · 4↑'
@@ -330,8 +326,8 @@ const nodePanel = {
     set('ni-rf',   ni.relayfee!=null?f(ni.relayfee*1e5,2)+' sat/vB':'—');
     set('ni-rpc',  rpcNode||'—');
 
-    const ibdSec=document.getElementById('ibd-section');
-    if(ibdSec) ibdSec.style.display=bc.initialblockdownload?'block':'none';
+    const syncSec=document.getElementById('sync-section');
+    if(syncSec) syncSec.style.display=bc.initialblockdownload?'block':'none';
   },
 
   _renderChainTips(tips){
@@ -563,22 +559,22 @@ const nodePanel = {
     this._renderLocalAddrs(this._lastLocalAddrs);
   },
 
-  _updateIBD(progress){
+  _updateSync(progress){
     const now=Date.now();
-    this._ibdHistory.push({progress,ts:now});
-    if(this._ibdHistory.length>20) this._ibdHistory.shift();
+    this._syncHistory.push({progress,ts:now});
+    if(this._syncHistory.length>20) this._syncHistory.shift();
 
-    const fill=document.getElementById('ibd-fill');
+    const fill=document.getElementById('sync-fill');
     const pct=progress*100;
     if(fill) fill.style.width=pct.toFixed(2)+'%';
 
-    if(this._ibdHistory.length<3){ set('ibd-eta',pct.toFixed(3)+'%'); return; }
+    if(this._syncHistory.length<3){ set('sync-eta',pct.toFixed(3)+'%'); return; }
 
-    const newest=this._ibdHistory[this._ibdHistory.length-1];
-    const oldest=this._ibdHistory[0];
+    const newest=this._syncHistory[this._syncHistory.length-1];
+    const oldest=this._syncHistory[0];
     const dp=newest.progress-oldest.progress;
     const dt=newest.ts-oldest.ts;
-    if(dp<=0||dt<=0){ set('ibd-eta',pct.toFixed(3)+'%'); return; }
+    if(dp<=0||dt<=0){ set('sync-eta',pct.toFixed(3)+'%'); return; }
 
     const sLeft=(1-progress)/(dp/dt)/1000;
     let eta;
@@ -586,7 +582,7 @@ const nodePanel = {
     else if(sLeft<3600) eta=Math.round(sLeft/60)+'m '+Math.round(sLeft%60)+'s';
     else if(sLeft<86400)eta=Math.round(sLeft/3600)+'h '+Math.round((sLeft%3600)/60)+'m';
     else                eta=Math.round(sLeft/86400)+'d '+Math.round((sLeft%86400)/3600)+'h';
-    set('ibd-eta', pct.toFixed(3)+'%  · est. '+eta);
+    set('sync-eta', pct.toFixed(3)+'%  · est. '+eta);
   },
 };
 
@@ -1804,7 +1800,7 @@ const poller = {
   _pollTimer: null,
   _fetching: false,
   _hadSuccess: false,
-  _lastIBD: false,
+  _lastSync: false,
   _lastFetchAt: null,
 
   async fetchNow(){
@@ -1880,15 +1876,15 @@ const poller = {
 
   schedule(){
     clearInterval(this._pollTimer);
-    const interval=this._lastIBD?30000:10000;
+    const interval=this._lastSync?30000:10000;
     this._pollTimer=setInterval(async()=>{
-      const prev=this._lastIBD;
+      const prev=this._lastSync;
       await this.fetchNow();
-      if(this._lastIBD!==prev) this.schedule();
+      if(this._lastSync!==prev) this.schedule();
     },interval);
   },
 
-  setIBD(ibd){ this._lastIBD=ibd; },
+  setSync(syncing){ this._lastSync=syncing; },
   getLastFetchAt(){ return this._lastFetchAt; },
 
   exportJSON(){
@@ -1912,7 +1908,7 @@ function safeRender(name, fn){
 }
 
 function renderAll(d){
-  poller.setIBD(d.blockchain?.initialblockdownload||false);
+  poller.setSync(d.blockchain?.initialblockdownload||false);
 
   safeRender('node',        ()=> nodePanel.render(d));
   safeRender('chain',       ()=> chainPanel.render(d));

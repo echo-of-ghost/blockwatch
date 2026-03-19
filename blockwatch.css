@@ -54,8 +54,7 @@ html, body { height: 100vh; overflow: hidden; background: var(--void); color: va
 .tb-ver-badge  { font-size: 8px; font-weight: 600; letter-spacing: .05em; font-family: var(--mono); padding: 2px 6px; border-radius: 2px; background: var(--odim); color: var(--orange); }
 .tb-sync-badge { font-size: 8px; font-weight: 600; letter-spacing: .06em; padding: 1px 6px; border-radius: 2px; }
 .tb-sync-badge.synced  { background: rgba(90,170,106,.15); color: var(--grn); }
-.tb-sync-badge.syncing { background: rgba(168,168,168,.12); color: var(--t2); }
-.tb-sync-badge.ibd     { background: var(--odim); color: var(--orange); }
+.tb-sync-badge.syncing { background: rgba(168,168,168,.1); color: var(--t3); }
 .tb-height-main{ display:inline-flex; align-items:center; font-size: 11px; font-weight: 600; letter-spacing: .04em; color: var(--orange); background: var(--odim); padding: 0px 7px; border-radius: 2px; line-height: 20px; }
 .tb-warn       { color: var(--orange); font-size: 10px; }
 .tb-dim        { color: var(--t3); font-size: 10px; }
@@ -407,10 +406,10 @@ a.ext-link:hover { color: var(--orange); }
 .pa-btn.pa-unban { background:rgba(90,170,106,.15); color:var(--grn); font-size:8px; padding:1px 7px; flex-shrink:0; }
 .pa-btn.pa-unban:hover { background:rgba(90,170,106,.3); color:var(--grn); }
 
-/* ── IBD bar ── */
-.ibd-track { height: 2px; background: var(--raised); border-radius: 2px; overflow: hidden; margin: 3px 0; }
-.ibd-fill  { height: 100%; background: var(--orange); border-radius: 2px; transition: width 1s cubic-bezier(.4,0,.2,1); }
-.ibd-eta   { font-size: 9px; color: var(--t4); margin-top: 1px; }
+/* ── Sync bar ── */
+.sync-track { height: 2px; background: var(--raised); border-radius: 2px; overflow: hidden; margin: 3px 0; }
+.sync-fill  { height: 100%; background: var(--orange); border-radius: 2px; transition: width 1s cubic-bezier(.4,0,.2,1); }
+.sync-eta   { font-size: 9px; color: var(--t4); margin-top: 1px; }
 
 /* ── Node warnings banner ── */
 #node-warnings {
