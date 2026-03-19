@@ -313,7 +313,7 @@ const nodePanel = {
     set('ni-sync', synced?'100.0000%':pct.toFixed(4)+'%');
     set('ni-ta',   tipTime?utils.fmtAgeAgo(now-tipTime):'—');
     set('ni-mt',   bc.mediantime?utils.fmtTimestamp(bc.mediantime):'—');
-    set('ni-sync',  bc.initialblockdownload?'active':'complete');
+    set('ni-sync-status',  bc.initialblockdownload?'active':'complete');
     set('ni-pv',   ni.protocolversion!=null?String(ni.protocolversion):'—');
     set('ni-conn', ni.connections!=null?(ni.connections+(ni.maxconnections?(' / '+ni.maxconnections):'')):'—');
     // in/out split — shown as e.g. '8↓ · 4↑'
