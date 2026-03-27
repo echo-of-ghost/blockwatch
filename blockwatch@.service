@@ -1,25 +1,31 @@
 [Unit]
-Description=blockwatch Bitcoin node dashboard
+Description=Blockwatch Bitcoin Node Dashboard
 After=network.target bitcoind.service
 Wants=bitcoind.service
 
 [Service]
 Type=simple
 User=%i
+Group=%i
+
 WorkingDirectory=/home/%i/blockwatch
 ExecStart=/usr/bin/node server.js
+
 Restart=on-failure
 RestartSec=5s
 
-# Environment — uncomment and set if not using cookie auth
-# Environment=BITCOIN_RPC_USER=yourusername
-# Environment=BITCOIN_RPC_PASS=yourpassword
+# Security hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/home/%i/blockwatch
 
-# Optional overrides
+# Optional environment variables
 # Environment=PORT=3000
 # Environment=HOST=127.0.0.1
 # Environment=BITCOIN_RPC_HOST=127.0.0.1
 # Environment=BITCOIN_RPC_PORT=8332
+# Environment=BITCOIN_RPC_USER=...
+# Environment=BITCOIN_RPC_PASS=...
 
 [Install]
 WantedBy=multi-user.target

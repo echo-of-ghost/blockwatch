@@ -281,7 +281,7 @@ If your instance only serves one network, you can simplify the path logic too.
 
 ### Panels
 
-All panels are resizable by dragging the handles between them. Panels can also be dragged by their header to reorder them within or across columns. Hide a panel by clicking `×` on its header, or right-clicking the header for a context menu. Hidden panels can be restored from the status bar at the bottom.
+All panels are resizable by dragging the handles between them. Panels can also be dragged by their header to reorder them within or across columns. Hide a panel by right-clicking its header for a context menu. Hidden panels can be restored via the restore chips that appear in the titlebar.
 
 Panel order, column widths, and hidden state all persist automatically across page refreshes via localStorage.
 
@@ -294,6 +294,8 @@ Click any row in the peers table to inspect that peer's full detail — protocol
 | Key | Action |
 |---|---|
 | `R` | Force a full refresh |
+| `L` | Toggle light / dark mode |
+| `/` | Focus peer filter |
 
 ### Status bar
 
@@ -301,7 +303,7 @@ The bottom status bar shows:
 - Live connection dot (pulses green when synced, red on error)
 - Staleness indicator — shows time since last successful fetch if data is stale
 - Any node warnings from `getblockchaininfo`
-- Hidden panel restore pills
+- Hidden panel restore chips (appear in titlebar when panels are hidden)
 
 ---
 
