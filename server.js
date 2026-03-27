@@ -71,22 +71,32 @@ function prompt(question,hidden=false){
   return new Promise(resolve=>{
     const rl=readline.createInterface({input:process.stdin,output:process.stdout});
     if(hidden){
+      // setRawMode requires an interactive TTY. If stdin has been redirected
+      // (e.g. piped input, systemd with StandardInput=null, Docker non-interactive),
+      // fall back to plain readline so the process doesn't hang waiting for raw bytes
+      // that will never arrive. The password will echo in this fallback path — use
+      // env vars (BITCOIN_RPC_USER / BITCOIN_RPC_PASS) in non-interactive deployments.
+      if(!process.stdin.isTTY){
+        process.stdout.write(question+'(warning: stdin is not a TTY — password will echo)\n');
+        rl.question('',ans=>{rl.close();resolve(ans.trim());});
+        return;
+      }
       process.stdout.write(question);
-      process.stdin.setRawMode&&process.stdin.setRawMode(true);
+      process.stdin.setRawMode(true);
       let val='';
       process.stdin.resume();
       process.stdin.setEncoding('utf8');
       const onData=ch=>{
         if(ch==='\u0003'){
           // Ctrl+C — abort cleanly rather than resolving with partial input
-          process.stdin.setRawMode&&process.stdin.setRawMode(false);
+          process.stdin.setRawMode(false);
           process.stdin.pause();
           process.stdin.removeListener('data',onData);
           rl.close();
           process.stdout.write('\n');
           process.exit(0);
         } else if(ch==='\n'||ch==='\r'){
-          process.stdin.setRawMode&&process.stdin.setRawMode(false);
+          process.stdin.setRawMode(false);
           process.stdin.pause();
           process.stdin.removeListener('data',onData);
           process.stdout.write('\n');
@@ -154,21 +164,35 @@ async function loadAuth(){
 }
 
 const _rpcAgent=new http.Agent({keepAlive:true,maxSockets:8,keepAliveMsecs:3000});
+const crypto=require('crypto');
 
 // Static file cache — loaded once at startup, served from memory on every request.
 // Avoids a disk read per browser request. To hot-reload during development, restart the server.
+// JS and CSS get an ETag (SHA-256 of content) and a 1-hour cache so browsers skip the
+// round-trip on repeat visits. index.html stays no-store so changes land immediately.
 const _static={};
 function loadStaticFiles(){
   const files=[
-    {path:path.join(__dirname,'index.html'),   mime:'text/html',              key:'/index.html'},
-    {path:path.join(__dirname,'blockwatch.js'), mime:'application/javascript', key:'/blockwatch.js'},
-    {path:path.join(__dirname,'blockwatch.css'),mime:'text/css',               key:'/blockwatch.css'},
+    {path:path.join(__dirname,'index.html'),    mime:'text/html',              key:'/index.html',     noStore:true},
+    {path:path.join(__dirname,'blockwatch.js'),  mime:'application/javascript', key:'/blockwatch.js',  noStore:false},
+    {path:path.join(__dirname,'blockwatch.css'), mime:'text/css',               key:'/blockwatch.css', noStore:false},
+    {path:path.join(__dirname,'robots.txt'),mime:'text/plain',key:'/robots.txt',noStore:false,optional:true},
+    // Fonts are optional — the UI falls back gracefully to system-ui if absent.
+    // To use Geist, download the .woff2 files from https://vercel.com/font and
+    // place them alongside server.js. Missing font files are silently skipped.
+    {path:path.join(__dirname,'Geist-Regular.woff2'),     mime:'font/woff2',key:'/Geist-Regular.woff2',     noStore:false,optional:true},
+    {path:path.join(__dirname,'GeistMono-Regular.woff2'), mime:'font/woff2',key:'/GeistMono-Regular.woff2', noStore:false,optional:true},
   ];
+  const REQUIRED_KEYS=new Set(['/index.html','/blockwatch.js','/blockwatch.css']);
   for(const f of files){
     try{
-      _static[f.key]={buf:fs.readFileSync(f.path), mime:f.mime};
+      const buf=fs.readFileSync(f.path);
+      const etag='"'+crypto.createHash('sha256').update(buf).digest('hex').slice(0,16)+'"';
+      _static[f.key]={buf,mime:f.mime,etag,noStore:f.noStore};
     }catch(e){
-      console.error('[warn] could not preload '+f.path+': '+e.message);
+      if(REQUIRED_KEYS.has(f.key)) console.error('[error] required static file missing '+f.path+': '+e.message);
+      else if(!f.optional)         console.error('[warn] could not preload '+f.path+': '+e.message);
+      // optional files (fonts, robots.txt) are silently skipped — no console noise
     }
   }
 }
@@ -245,7 +269,10 @@ async function _doFetchAll(){
     Promise.all(hashes.map(h=>h?safe('getblockheader',[h,true]):null)),
     ibd
       ?Promise.resolve(heights.map(()=>null))
-      :Promise.all(hashes.map((h,i)=>h?safe('getblockstats',[heights[i],['txs','total_size','total_weight','time','height','avgfee','avgfeerate','ins','outs','subsidy','totalfee','feerate_percentiles']]):null)),
+      // Use the hash (already fetched above) rather than the height integer — both are valid
+      // blockhash args for getblockstats, but re-using the hash avoids any height/hash mismatch
+      // in edge cases such as a reorg occurring between the getblockhash and getblockstats calls.
+      :Promise.all(hashes.map(h=>h?safe('getblockstats',[h,['txs','total_size','total_weight','time','height','avgfee','avgfeerate','ins','outs','subsidy','totalfee','feerate_percentiles']]):null)),
   ]):[[],[]];
   const blocks=hashes.map((hash,i)=>{
     if(!hash)return null;
@@ -278,12 +305,9 @@ async function _doFetchAll(){
 
 // Rate limit /api/data to 5 requests/sec — protects bitcoind from tight loops.
 // Uses a simple token bucket: refills 5 tokens/sec, max burst of 5.
-// NOTE: this is a GLOBAL limit across all clients, not per-IP. A single browser
-// tab polls every 10–30s so the limit is never approached in normal use. With
-// multiple tabs open, each tab polls independently but the server deduplicates
-// in-flight fetches — only one RPC batch fires regardless of tab count, and all
-// tabs share that result. The rate limit is a last-resort guard against tight
-// polling loops (e.g. a script hammering /api/data), not a per-user quota.
+// A single browser tab polls every 10-30s so this limit is never approached in
+// normal use. Multiple tabs share the in-flight promise so only one RPC batch
+// fires regardless of tab count. The limit guards against abusive tight loops.
 const _rl={tokens:5,last:Date.now(),rate:5,max:5};
 function rateLimitOk(){
   const now=Date.now();
@@ -309,8 +333,8 @@ const server=http.createServer(async(req,res)=>{
   res.setHeader('Content-Security-Policy',
     "default-src 'self'; "+
     "script-src 'self'; "+
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "+
-    "font-src https://fonts.gstatic.com; "+
+    "style-src 'self' 'unsafe-inline'; "+
+    "font-src 'self'; "+
     "img-src 'self' data:; "+
     "connect-src 'self'; "+
     "frame-ancestors 'none'; "+
@@ -392,8 +416,18 @@ const server=http.createServer(async(req,res)=>{
   const _staticKey=url.pathname==='/'?'/index.html':url.pathname;
   if(_static[_staticKey]){
     const _entry=_static[_staticKey];
-    res.writeHead(200,{'Content-Type':_entry.mime,'Cache-Control':'no-store'});
-    res.end(_entry.buf);
+    if(_entry.noStore){
+      res.writeHead(200,{'Content-Type':_entry.mime,'Cache-Control':'no-store'});
+      res.end(_entry.buf);
+    } else {
+      // Conditional GET — if the browser already has this version, skip the body
+      if(req.headers['if-none-match']===_entry.etag){
+        res.writeHead(304);res.end();
+      } else {
+        res.writeHead(200,{'Content-Type':_entry.mime,'Cache-Control':'public, max-age=3600','ETag':_entry.etag});
+        res.end(_entry.buf);
+      }
+    }
     return;
   }
   if(_staticKey==='/index.html'||_staticKey==='/blockwatch.js'||_staticKey==='/blockwatch.css'){
@@ -421,9 +455,21 @@ const server=http.createServer(async(req,res)=>{
 
 // SIGTERM: sent by systemd, Docker, Umbrel on stop/restart/update
 // SIGINT:  sent by Ctrl+C in a terminal
-function shutdown(){
+let _shuttingDown=false;
+function shutdown(signal){
+  if(_shuttingDown) return;
+  _shuttingDown=true;
+  // Stop accepting new connections. Callback fires once all existing connections close.
+  // Give in-flight requests up to 5s to finish before forcing exit — avoids dropping
+  // a browser poll mid-response and leaving the client showing stale data.
+  const force=setTimeout(()=>{
+    console.error('[blockwatch] shutdown timeout — forcing exit');
+    process.exit(1);
+  },5000);
+  force.unref(); // don't let this timer alone keep the process alive
   server.close(()=>{
-    _rpcAgent.destroy(); // drain keep-alive sockets so the process exits cleanly
+    _rpcAgent.destroy();
+    clearTimeout(force);
     process.exit(0);
   });
 }
@@ -431,9 +477,11 @@ process.on('SIGTERM', shutdown);
 process.on('SIGINT',  shutdown);
 process.on('unhandledRejection',(reason)=>{
   console.error('[unhandled rejection]', reason);
-  process.exit(1);
+  // Give the server a chance to finish in-flight requests before exiting.
+  // Unhandled rejections are almost always logic bugs — treat as fatal but drain first.
+  shutdown();
 });
 process.on('uncaughtException',(err)=>{
   console.error('[uncaught exception]', err);
-  process.exit(1);
+  shutdown();
 });
