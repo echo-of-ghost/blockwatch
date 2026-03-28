@@ -500,7 +500,6 @@ const nodePanel = {
     el.innerHTML = this._lastLocalAddrs
       .map((a) => {
         const addr = esc(a.address || "");
-        const score = a.score != null ? a.score : "";
         const type = addr.endsWith(".onion")
           ? "onion"
           : addr.startsWith("[") || (addr.includes(":") && !addr.includes("."))
@@ -518,7 +517,7 @@ const nodePanel = {
         return `<div class="la-row">
         <span class="${cls}">${display}</span>
         <span class="la-type ${typeClass}">${type}</span>
-        ${score !== "" ? `<span class="la-score">s:${score}</span>` : ""}
+        <span class="copy-icon" data-copy="${addr}" role="button" tabindex="0" aria-label="Copy address">⎘</span>
       </div>`;
       })
       .join("");

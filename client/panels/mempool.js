@@ -63,18 +63,6 @@ const mempoolPanel = {
       <div class="bd-body">
 
         <div class="bd-section">
-          <div class="bd-section-label">backlog</div>
-          <div class="bd-kv">
-            <span class="k">pending txs</span>
-            <span class="v o" id="mp-bl-txs">${fb(mi.size || 0)}</span>
-          </div>
-          <div class="bd-kv">
-            <span class="k">tx data</span>
-            <span class="v dim" id="mp-bl-bytes">${utils.fmtBytes(mi.bytes || 0)}</span>
-          </div>
-        </div>
-
-        <div class="bd-section">
           <div class="bd-section-label">memory usage</div>
           <div class="bd-fill-track">
             <div class="bd-fill-bar" id="mp-fill-bar"
@@ -87,13 +75,25 @@ const mempoolPanel = {
           </div>
         </div>
 
-        <div class="bd-section">
-          <div class="bd-section-label">size history</div>
-          <canvas id="mp-canvas" style="display:block;width:100%;height:72px"></canvas>
+        <div class="bd-section bd-section-chart">
+          <div class="bd-section-label">tx backlog · vbytes</div>
+          <canvas id="mp-canvas" style="display:block;width:100%"></canvas>
           <div class="chart-leg" style="margin-top:3px">
             <span class="chart-leg-min" id="mp-min">—</span
             ><span class="chart-leg-avg" id="mp-avg">—</span
             ><span class="chart-leg-max" id="mp-max">—</span>
+          </div>
+        </div>
+
+        <div class="bd-section">
+          <div class="bd-section-label">backlog</div>
+          <div class="bd-kv">
+            <span class="k">pending txs</span>
+            <span class="v o" id="mp-bl-txs">${fb(mi.size || 0)}</span>
+          </div>
+          <div class="bd-kv">
+            <span class="k">tx data</span>
+            <span class="v dim" id="mp-bl-bytes">${utils.fmtBytes(mi.bytes || 0)}</span>
           </div>
         </div>
 

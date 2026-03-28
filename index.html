@@ -249,12 +249,12 @@
               ><span class="v dim" id="mp-fullrbf">—</span>
             </div>
             <div class="kv ni-kv-cfg">
-              <span class="k dim">protocol</span
-              ><span class="v dim" id="ni-pv">—</span>
-            </div>
-            <div class="kv ni-kv-cfg">
-              <span class="k dim">rpc</span
-              ><span class="v mono" id="ni-rpc">—</span>
+              <span class="k dim">protocol · rpc</span
+              ><span class="v v-pair"
+                ><span class="dim" id="ni-pv">—</span
+                ><span class="v-pair-sep">·</span
+                ><span class="dim mono" id="ni-rpc">—</span></span
+              >
             </div>
             <div class="sec sec-row">
               <span>reachable addresses</span
@@ -310,12 +310,12 @@
               ></canvas>
             </div>
             <div class="kv">
-              <span class="k" data-tip="sent · recv">recv total</span
-              ><span class="v dim" id="bw-rv">—</span>
-            </div>
-            <div class="kv">
-              <span class="k" data-tip="sent · recv">sent total</span
-              ><span class="v dim" id="bw-sn">—</span>
+              <span class="k">session totals</span
+              ><span class="v v-pair"
+                ><span class="dim" id="bw-rv">—</span
+                ><span class="v-pair-sep">·</span
+                ><span class="dim" id="bw-sn">—</span></span
+              >
             </div>
             <div class="sec">fee estimates (sat/vB)</div>
             <div id="fee-rows"></div>
@@ -484,13 +484,9 @@
             ><span class="ph-meta" id="mn-ph">—</span>
           </div>
           <div class="pb">
-            <div class="kv">
-              <span class="k">diff · hashrate</span
-              ><span class="v v-pair"
-                ><span class="dim" id="mn-df">—</span
-                ><span class="v-pair-sep">·</span
-                ><span class="o" id="mn-hr">—</span></span
-              >
+            <div class="mn-hdr">
+              <div class="mn-hdr-val" id="mn-hr">—</div>
+              <div class="mn-hdr-sub">hashrate · <span id="mn-df">—</span> diff</div>
             </div>
             <div class="kv">
               <span class="k dim">chainwork</span

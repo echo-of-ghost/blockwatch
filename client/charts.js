@@ -66,9 +66,19 @@ const charts = {
     _measure() {
       const canvas = $("mp-canvas");
       if (!canvas) return;
-      const r = canvas.getBoundingClientRect();
-      if (r.width <= 10) return;
-      this._render(this._history, r.width, 72);
+
+      const panel = this._panel || (this._panel = $q('[data-panel="mempool-viz"]'));
+      if (!panel) return;
+
+      const pr = panel.getBoundingClientRect();
+      if (pr.width <= 10) return;
+
+      const ph = panel.querySelector(".ph");
+      const phH = ph ? ph.getBoundingClientRect().height : 28;
+      const contentH = pr.height - phH;
+      const W = pr.width - 24;
+      const H = Math.max(60, Math.min(220, Math.round(contentH * 0.38)));
+      this._render(this._history, W, H);
     },
 
     _render(history, W, H) {

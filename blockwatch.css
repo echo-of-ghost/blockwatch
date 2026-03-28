@@ -905,7 +905,7 @@ body {
   gap: 5px;
 }
 .bw-live-arrow {
-  font-size: var(--fs-xs);
+  font-size: var(--fs-sm);
   line-height: 1;
 }
 .bw-live-recv {
@@ -915,11 +915,11 @@ body {
   color: var(--pos);
 }
 .bw-live-val {
-  font-size: var(--fs-md);
-  font-weight: 500;
+  font-size: var(--fs-xl);
+  font-weight: 300;
   color: var(--t1);
   font-family: var(--mono);
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
   line-height: 1;
 }
 .bw-live-lbl {
@@ -1007,7 +1007,7 @@ canvas {
 .fee-bar-val {
   font-size: var(--fs-sm);
   font-weight: 500;
-  color: var(--t3);
+  color: var(--t2);
   line-height: 1;
   letter-spacing: -0.02em;
 }
@@ -1020,9 +1020,11 @@ canvas {
 }
 .fee-bar-row:nth-child(3) .fee-bar-val {
   font-size: var(--fs-xs);
+  color: var(--t3);
 }
 .fee-bar-row:nth-child(4) .fee-bar-val {
   font-size: var(--fs-xs);
+  color: var(--t3);
 }
 .fee-bar-unit {
   font-size: var(--fs-2xs);
@@ -1052,7 +1054,7 @@ canvas {
 }
 .tbl td {
   padding: 4px 6px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.018);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.032);
   white-space: nowrap;
   font-size: var(--fs-xs);
 }
@@ -1175,19 +1177,20 @@ a.ext-link:hover {
 }
 
 .td-peer-main {
-  padding: 6px 8px 6px 12px !important;
+  padding: 7px 8px 7px 12px !important;
   min-width: 0;
   overflow: hidden;
 }
 
-/* address + net line */
+/* address + badges line */
 .peer-row-top {
   display: flex;
-  align-items: baseline;
+  align-items: center;
+  justify-content: space-between;
   gap: 6px;
   overflow: hidden;
   min-width: 0;
-  margin-bottom: 1px;
+  margin-bottom: 2px;
 }
 .peer-net-label {
   font-size: var(--fs-xs);
@@ -1212,8 +1215,8 @@ a.ext-link:hover {
 .peer-badges {
   display: flex;
   gap: 4px;
-  margin-bottom: 3px;
   align-items: center;
+  flex-shrink: 0;
   flex-wrap: wrap;
 }
 .peer-badge {
@@ -1256,8 +1259,9 @@ a.ext-link:hover {
 }
 
 .peer-addr-text {
-  font-size: var(--fs-xs);
-  color: var(--t2);
+  font-size: var(--fs-sm);
+  font-weight: 400;
+  color: var(--t1);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1299,7 +1303,7 @@ a.ext-link:hover {
 }
 .peer-bar-track {
   flex: 1;
-  height: 2px;
+  height: 3px;
   background: var(--raised);
   border-radius: 2px;
   overflow: hidden;
@@ -1326,7 +1330,6 @@ a.ext-link:hover {
 }
 .peer-bar-val.recv {
   color: var(--orange);
-  opacity: 0.8;
 }
 
 /* sync fill states */
@@ -1342,8 +1345,8 @@ a.ext-link:hover {
 
 /* Col 2: ping */
 .td-peer-ping {
-  width: 64px;
-  min-width: 64px;
+  width: 68px;
+  min-width: 68px;
   padding: 0 10px 0 4px !important;
   vertical-align: middle;
   text-align: right;
@@ -1356,15 +1359,17 @@ a.ext-link:hover {
 }
 .ping-dot {
   display: inline-block;
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   flex-shrink: 0;
 }
 .ping-val {
-  font-size: var(--fs-xs);
+  font-size: var(--fs-sm);
+  font-weight: 300;
   min-width: 32px;
   text-align: right;
+  letter-spacing: -0.01em;
 }
 .ping-dot.grn {
   background: var(--grn);
@@ -1447,6 +1452,28 @@ a.ext-link:hover {
   white-space: nowrap;
   flex-shrink: 0;
   font-family: var(--mono);
+}
+
+/* ── Mining — hashrate hero ── */
+.mn-hdr {
+  margin: -8px -12px 8px;
+  padding: 9px 12px 8px;
+  background: var(--ink);
+  border-bottom: 1px solid var(--border);
+}
+.mn-hdr-val {
+  font-size: var(--fs-2xl);
+  font-weight: 300;
+  color: var(--t1);
+  letter-spacing: -0.03em;
+  line-height: 1;
+  font-family: var(--sans);
+}
+.mn-hdr-sub {
+  font-size: var(--fs-2xs);
+  color: var(--t4);
+  font-family: var(--mono);
+  margin-top: 4px;
 }
 
 /* ── Mining — epoch progress bar ── */
@@ -1557,29 +1584,37 @@ a.ext-link:hover {
   margin-bottom: 3px;
 }
 .pd-header-net {
-  font-size: var(--fs-xs);
+  font-size: 9px;
   font-weight: 700;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 2px;
+  font-family: var(--sans);
   flex-shrink: 0;
 }
 .pd-header-net.net-onion {
+  background: var(--odim);
   color: var(--orange);
 }
 .pd-header-net.net-ipv4 {
-  color: var(--t3);
+  background: var(--raised);
+  color: var(--t2);
 }
 .pd-header-net.net-ipv6 {
-  color: var(--t3);
+  background: var(--raised);
+  color: var(--t2);
 }
 .pd-header-net.net-i2p {
-  color: var(--t3);
+  background: var(--grn-dim);
+  color: var(--grn);
 }
 .pd-header-addr {
-  font-size: var(--fs-md);
+  font-size: var(--fs-xl);
   font-weight: 300;
   color: var(--t1);
-  letter-spacing: -0.01em;
-  font-family: var(--sans);
+  letter-spacing: -0.02em;
+  font-family: var(--mono);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1653,7 +1688,7 @@ a.ext-link:hover {
 
 .pd-stat-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 1px;
   background: var(--border);
   border-bottom: 1px solid var(--border);
@@ -1667,12 +1702,14 @@ a.ext-link:hover {
   gap: 2px;
 }
 .pd-stat-val {
-  font-size: var(--fs-md);
-  font-weight: 400;
+  font-size: var(--fs-xl);
+  font-weight: 300;
   color: var(--t1);
   font-family: var(--mono);
   line-height: 1;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .pd-stat-val.grn {
   color: var(--grn);
@@ -2413,11 +2450,8 @@ a.ext-link:hover {
   flex-shrink: 0;
   min-width: 32px;
 }
-.la-score {
-  font-size: var(--fs-xs);
-  color: var(--t4);
-  flex-shrink: 0;
-}
+.la-row .copy-icon { opacity: 0; }
+.la-row:hover .copy-icon { opacity: 1; }
 .la-toggle {
   font-size: var(--fs-xs);
   font-family: var(--mono);

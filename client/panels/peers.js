@@ -37,7 +37,6 @@ const peersPanel = {
     const peers = d.peers || [];
     const ni = d.networkInfo || {};
     const ibd = d.blockchain?.initialblockdownload || false;
-    const now = Date.now() / 1000;
     this._cache = peers;
 
     const peersIn = peers.filter((p) => p.inbound);
@@ -62,12 +61,9 @@ const peersPanel = {
     const maxRecv = peers.reduce((m, p) => Math.max(m, p.bytesrecv || 0), 1);
     const maxBW = Math.max(maxSent, maxRecv);
 
-    const bestBlock = d.blockchain?.blocks || 0;
-
     tbody.innerHTML = peers
       .map((p) => {
         const net = utils.peerNet(p.addr || "", p.network || "");
-        const isBlockRelay = (p.connection_type || "").includes("block-relay");
         const isSel = p.id === this._selectedId;
 
         // Badges - compact labels
@@ -84,7 +80,6 @@ const peersPanel = {
                 : "peer-badge-ipv4";
 
         // Address cell
-        const addrFull = esc(p.addr || "");
         const addr = esc(
           (p.addr || "").replace(/:\d+$/, "").replace(/^\[(.+)\]$/, "$1"),
         );
@@ -108,12 +103,12 @@ const peersPanel = {
         return `<tr data-pid="${p.id}" role="row" tabindex="0" aria-selected="${isSel}"
         class="${isSel ? "peer-sel" : ""}">
         <td class="td-peer-main">
-          <div class="peer-badges">
-            <span class="peer-badge ${dirBadgeClass}">${dirLabel}</span>
-            <span class="peer-badge ${netBadgeClass}">${netLabel}</span>
-          </div>
           <div class="peer-row-top">
             <span class="peer-addr-text">${addr || "—"}</span>
+            <span class="peer-badges">
+              <span class="peer-badge ${dirBadgeClass}">${dirLabel}</span>
+              <span class="peer-badge ${netBadgeClass}">${netLabel}</span>
+            </span>
           </div>
           <span class="peer-ver-text">${ver}</span>
           <div class="peer-bars-group">
@@ -275,11 +270,11 @@ const peersPanel = {
     const header = `
       <div class="pd-header">
         <div class="pd-header-top">
-          <span class="pd-header-net ${netLabelClass}">${esc(net)}</span>
           <span class="pd-header-addr">${esc(addrDisplay || "—")}</span>
           <span class="pd-header-copy copy-icon" data-copy="${esc(p.addr || "")}">⎘</span>
         </div>
         <div class="pd-header-badges">
+          <span class="pd-header-net ${netLabelClass}">${esc(net)}</span>
           <span class="pd-badge ${p.inbound ? "pd-badge-dir-in" : "pd-badge-dir-out"}">${p.inbound ? "← in" : "→ out"}</span>
           ${ct ? `<span class="pd-badge pd-badge-ct ${ctClass}">${esc(ctLabel)}</span>` : ""}
           ${verClean ? `<span class="pd-badge pd-badge-ua">${verClean}</span>` : ""}
@@ -299,12 +294,20 @@ const peersPanel = {
           <span class="pd-stat-lbl">connected</span>
         </div>
         <div class="pd-stat-cell">
-          <span class="pd-stat-val dim" data-pd="synced-blocks">${p.synced_blocks ? fb(p.synced_blocks) : "—"}</span>
-          <span class="pd-stat-lbl">synced blocks</span>
-        </div>
-        <div class="pd-stat-cell">
           <span class="pd-stat-val dim">${p.version ? esc(String(p.version)) : "—"}</span>
           <span class="pd-stat-lbl">protocol</span>
+        </div>
+        <div class="pd-stat-cell">
+          <span class="pd-stat-val dim" data-pd="synced-headers">${p.synced_headers ? fb(p.synced_headers) : "—"}</span>
+          <span class="pd-stat-lbl">headers</span>
+        </div>
+        <div class="pd-stat-cell">
+          <span class="pd-stat-val dim" data-pd="synced-blocks">${p.synced_blocks ? fb(p.synced_blocks) : "—"}</span>
+          <span class="pd-stat-lbl">blocks</span>
+        </div>
+        <div class="pd-stat-cell">
+          <span class="pd-stat-val dim">${p.startingheight ? fb(p.startingheight) : "—"}</span>
+          <span class="pd-stat-lbl">start height</span>
         </div>
         <div class="pd-stat-cell">
           <span class="pd-stat-val sent" data-pd="bw-sent">↑ ${utils.fmtBytes(p.bytessent || 0)}</span>
@@ -313,6 +316,10 @@ const peersPanel = {
         <div class="pd-stat-cell">
           <span class="pd-stat-val recv" data-pd="bw-recv">↓ ${utils.fmtBytes(p.bytesrecv || 0)}</span>
           <span class="pd-stat-lbl">recv</span>
+        </div>
+        <div class="pd-stat-cell">
+          <span class="pd-stat-val dim" data-pd="last-block-grid">${p.last_block > 0 ? utils.fmtAgeAgo(now - p.last_block) : "—"}</span>
+          <span class="pd-stat-lbl">last block</span>
         </div>
       </div>`;
 
@@ -387,6 +394,10 @@ const peersPanel = {
     set("lastrecv", p.lastrecv > 0 ? utils.fmtAgeAgo(now - p.lastrecv) : "—");
     set(
       "last-block",
+      p.last_block > 0 ? utils.fmtAgeAgo(now - p.last_block) : "—",
+    );
+    set(
+      "last-block-grid",
       p.last_block > 0 ? utils.fmtAgeAgo(now - p.last_block) : "—",
     );
     set(
