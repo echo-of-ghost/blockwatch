@@ -515,6 +515,11 @@ a.ext-link:hover { color: var(--orange); }
 .blk-fill-bar  { height: 100%; border-radius: 2px; transition: width .9s cubic-bezier(.4,0,.2,1); }
 .blk-fill-pct  { font-size: var(--fs-xs); color: var(--t4); line-height: 1; white-space: nowrap; flex-shrink: 0; font-family: var(--mono); }
 
+/* ── Mining — hashrate header ── */
+.mn-hdr { padding: 0 0 8px; margin-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,.018); flex-shrink: 0; }
+.mn-hdr-val { font-size: var(--fs-2xl); font-weight: 300; color: var(--t1); letter-spacing: -.03em; line-height: 1; font-family: var(--sans); }
+.mn-hdr-sub { font-size: var(--fs-xs); color: var(--t4); font-family: var(--sans); margin-top: 3px; }
+
 /* ── Mining — epoch progress bar ── */
 .mn-epoch-wrap {
   padding: 6px 0 6px;
