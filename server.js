@@ -653,7 +653,7 @@ async function initState() {
     uptime: uptime || 0,
     deploymentInfo: deploymentInfo || {},
     chainTips: Array.isArray(chainTips) ? chainTips : [],
-    minrelaytxfee: ni.relayfee ?? null,
+    minrelaytxfee: ni.relayfee ?? ni.minrelaytxfee ?? null,
     incrementalfee: ni.incrementalfee ?? null,
     networkWarnings: Array.isArray(ni.warnings)
       ? ni.warnings.join(" ")
@@ -835,7 +835,7 @@ function startSparseRefresh() {
       if (peers) _state.peers = peers;
       if (ni) {
         _state.networkInfo = ni;
-        _state.minrelaytxfee = ni.relayfee ?? _state.minrelaytxfee;
+        _state.minrelaytxfee = ni.relayfee ?? ni.minrelaytxfee ?? _state.minrelaytxfee;
         _state.incrementalfee = ni.incrementalfee ?? _state.incrementalfee;
         _state.networkWarnings = Array.isArray(ni.warnings)
           ? ni.warnings.join(" ")

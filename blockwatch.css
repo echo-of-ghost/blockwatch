@@ -3098,10 +3098,13 @@ a.ext-link:hover {
   font-weight: 700;
   flex-shrink: 0;
 }
-@keyframes toast-in {
-  from { opacity: 0; transform: translateX(-4px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
+.toast-warn  { border-left-color: var(--orange); }
+.toast-warn::before  { content: "!"; color: var(--orange); }
+.toast-info  { border-left-color: var(--t4); }
+.toast-info::before  { content: "·"; color: var(--t4); font-weight: 400; }
+.toast-dying { animation: toast-out 0.2s ease forwards; }
+@keyframes toast-in  { from { opacity: 0; transform: translateX(-4px); } to   { opacity: 1; transform: translateX(0); } }
+@keyframes toast-out { from { opacity: 1; transform: translateX(0); }    to   { opacity: 0; transform: translateX(-6px); } }
 .toast-dismiss {
   margin-left: auto;
   cursor: pointer;

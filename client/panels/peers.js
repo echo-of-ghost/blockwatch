@@ -508,7 +508,14 @@ const peersPanel = {
         r.classList.toggle("peer-sel", parseInt(r.dataset.pid, 10) === pid),
       );
     const p = this._cache.find((x) => x.id === pid);
-    if (p) this.renderDetail(p);
+    if (p) {
+      this.renderDetail(p);
+    } else {
+      const body = $("peer-detail-body");
+      if (body) body.innerHTML = '<div class="pd-empty">peer disconnected</div>';
+      setText("pd-ph", "—");
+      this._renderedPeerId = null;
+    }
   },
 
   exportTSV() {

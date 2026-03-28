@@ -63,6 +63,10 @@ const blocksPanel = {
       .join("");
 
     blocks.forEach((b) => this._seenHeights.add(b.height));
+    if (this._seenHeights.size > 200) {
+      const arr = [...this._seenHeights];
+      this._seenHeights = new Set(arr.slice(-200));
+    }
 
     if (!this._initialised && blocks.length) {
       // First load only: auto-select the tip and render the detail panel.

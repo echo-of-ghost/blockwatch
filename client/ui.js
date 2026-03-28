@@ -1047,7 +1047,7 @@ const toastStack = {
     return this._el;
   },
 
-  add(msg) {
+  add(msg, level = "error") {
     const el = this._container();
     if (!el) return;
     if (
@@ -1058,16 +1058,28 @@ const toastStack = {
     if (this._toasts.length >= this.MAX) this._dismiss(this._toasts[0].node);
 
     const node = document.createElement("div");
-    node.className = "toast";
+    const lvlClass = level === "warn" ? " toast-warn" : level === "info" ? " toast-info" : "";
+    node.className = "toast" + lvlClass;
     node.innerHTML = `<span class="toast-msg">${msg.replace(/</g, "&lt;")}</span><button class="toast-dismiss" aria-label="Dismiss">×</button>`;
     node
       .querySelector(".toast-dismiss")
       .addEventListener("click", () => this._dismiss(node));
     el.appendChild(node);
-    this._toasts.push({ node, msg });
+    const entry = { node, msg };
+    this._toasts.push(entry);
+
+    // auto-dismiss after 5 s
+    entry._timer = setTimeout(() => this._dismissFade(node), 5000);
+  },
+
+  _dismissFade(node) {
+    node.classList.add("toast-dying");
+    setTimeout(() => this._dismiss(node), 200);
   },
 
   _dismiss(node) {
+    const entry = this._toasts.find((t) => t.node === node);
+    if (entry?._timer) clearTimeout(entry._timer);
     node.remove();
     this._toasts = this._toasts.filter((t) => t.node !== node);
   },

@@ -433,8 +433,8 @@ const poller = {
 
   _onError(err) {
     this._failCount++;
-    toastStack.add(this._friendlyError(err.message));
-    console.error("[poller]", err.message);
+    toastStack.add(this._friendlyError(err.message), "warn");
+    console.warn("[poller]", err.message);
 
     setClass("live-dot", "dot err");
     mobileBar.setError();

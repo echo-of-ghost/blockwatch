@@ -33,8 +33,7 @@ const nodePanel = {
     setText("mp-fullrbf", mi.fullrbf != null ? (mi.fullrbf ? "enabled" : "disabled") : "—");
     const zmqEl = $("ni-zmq");
     if (zmqEl) {
-      zmqEl.textContent = d.zmqMode === "poll" ? "polling (no zmq)" : d.zmqMode === "zmq" ? "zmq" : "—";
-      zmqEl.style.color = d.zmqMode === "poll" ? "var(--orange)" : "";
+      zmqEl.textContent = d.zmqMode === "poll" ? "polling" : d.zmqMode === "zmq" ? "zmq" : "—";
     }
 
     this._renderTitlebar(bc, ni, d.uptime, blocks, d);

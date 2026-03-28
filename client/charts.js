@@ -226,7 +226,17 @@ const charts = {
     _render(blocks, W, H) {
       const canvas = $("bt-canvas");
       const ctx = setupCanvas(canvas, W, H);
-      if (!ctx || !blocks || blocks.length < 2) return;
+      if (!ctx) return;
+      if (!blocks || blocks.length < 2) {
+        const t4 = getComputedStyle(document.documentElement).getPropertyValue("--t4").trim() || "#555";
+        ctx.fillStyle = t4;
+        ctx.font = "10px Geist Mono, monospace";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("waiting for blocks…", W / 2, H / 2);
+        ctx.restore();
+        return;
+      }
 
       const accentRgb = getAccentRgb();
 
