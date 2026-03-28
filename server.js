@@ -660,6 +660,7 @@ async function initState() {
       : ni.warnings || "",
     ts: Date.now(),
     rpcNode: RPC_HOST + ":" + RPC_PORT,
+    zmqMode: _pollFallbackActive ? "poll" : "zmq",
   };
 }
 
@@ -746,6 +747,7 @@ async function initZmq() {
 function startPollFallback() {
   if (_pollFallbackActive) return;
   _pollFallbackActive = true;
+  if (_state) { _state.zmqMode = "poll"; broadcast(); }
 
   setInterval(async () => {
     if (!_state) return;

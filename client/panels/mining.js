@@ -36,7 +36,7 @@ const blocksPanel = {
     tbody.innerHTML = blocks
       .map((b, i) => {
         const isSel = b.height === this._selectedHeight;
-        const isNew = !this._seenHeights.has(b.height) && i === 0;
+        const isNew = this._seenHeights.size > 0 && !this._seenHeights.has(b.height) && i === 0;
         const fillPct = b.weight ? (b.weight / 4000000) * 100 : 0;
         const clr =
           fillPct >= 85

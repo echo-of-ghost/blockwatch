@@ -677,7 +677,9 @@ const utils = {
           }, 1200);
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        toastStack.add("copy failed — clipboard unavailable");
+      });
   },
 };
 
