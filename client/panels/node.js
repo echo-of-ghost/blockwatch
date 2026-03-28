@@ -25,9 +25,12 @@ const nodePanel = {
   render(d) {
     const bc = d.blockchain || {};
     const ni = d.networkInfo || {};
+    const mi = d.mempoolInfo || {};
     const cts = d.chainTxStats || {};
     const blocks = d.blocks || [];
     const now = Date.now() / 1000;
+
+    setText("mp-fullrbf", mi.fullrbf != null ? (mi.fullrbf ? "enabled" : "disabled") : "—");
 
     this._renderTitlebar(bc, ni, d.uptime, blocks, d);
     this._renderNodeInfo(bc, ni, d.rpcNode, blocks, now);

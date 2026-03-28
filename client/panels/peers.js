@@ -66,7 +66,6 @@ const peersPanel = {
         const net = utils.peerNet(p.addr || "", p.network || "");
         const isSel = p.id === this._selectedId;
 
-        // Badges - compact labels
         const dirLabel = p.inbound ? "in" : "out";
         const dirBadgeClass = p.inbound ? "peer-badge-in" : "peer-badge-out";
         const netLabel = net.toUpperCase();
@@ -79,7 +78,6 @@ const peersPanel = {
                 ? "peer-badge-i2p"
                 : "peer-badge-ipv4";
 
-        // Address cell
         const addr = esc(
           (p.addr || "").replace(/:\d+$/, "").replace(/^\[(.+)\]$/, "$1"),
         );
@@ -87,7 +85,6 @@ const peersPanel = {
         const sentPct = (((p.bytessent || 0) / maxBW) * 100).toFixed(1);
         const recvPct = (((p.bytesrecv || 0) / maxBW) * 100).toFixed(1);
 
-        // Ping
         const pc =
           p.pingtime > 0
             ? p.pingtime < 0.06
