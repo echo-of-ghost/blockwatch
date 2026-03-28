@@ -307,7 +307,7 @@ The theme is applied instantly on data load — no configuration needed.
 
 Block hashes in the blocks table link to [mempool.space](https://mempool.space) for full transaction-level detail. These links are chain-aware — testnet4 and signet blocks link to the correct mempool.space subdirectory automatically.
 
-To point links at your own self-hosted [mempool](https://github.com/mempool/mempool) instance, find the `mspaceUrl` function in `blockwatch.js` and update the base URL:
+To point links at your own self-hosted [mempool](https://github.com/mempool/mempool) instance, find the `mspaceUrl` function in `client/shared.js` and update the base URL:
 
 ```js
 // In blockwatch.js — mspaceUrl function
@@ -381,7 +381,7 @@ node server.js   # falls back automatically if zeromq not installed
 
 ## Font
 
-blockwatch uses [Geist Mono](https://vercel.com/font/geist) for a clean, modern monospace look. Loaded via Google Fonts with no local font files required.
+blockwatch uses [Geist](https://vercel.com/font/geist) for a clean, modern monospace look. Both `Geist` and `Geist Mono` are bundled as local `.woff2` files — no external requests, no network dependency.
 
 ---
 

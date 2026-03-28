@@ -186,15 +186,15 @@ const charts = {
         return bytes.toFixed(0);
       };
       ctx.font = "10px Geist Mono, monospace";
-      ctx.textAlign = "left";
+      ctx.textAlign = "right";
       ctx.fillStyle = `rgba(${rgb},0.85)`;
-      ctx.fillText(fmt(sizes[n - 1]) + "B", lx + 6, ly + 3.5);
+      ctx.fillText(fmt(sizes[n - 1]) + "B", lx - 6, ly + 3.5);
 
       ctx.restore();
 
-      setText("mp-min", fmt(minSize) + "B");
-      setText("mp-max", fmt(maxSize) + "B");
-      setText("mp-avg", fmt(avgSize) + "B");
+      setText("mp-min", "min " + fmt(minSize) + "B");
+      setText("mp-max", "max " + fmt(maxSize) + "B");
+      setText("mp-avg", "avg " + fmt(avgSize) + "B");
       const phEl = $("mp-ph");
       if (phEl) phEl.textContent = "mempool · " + n + " samples";
     },
@@ -263,6 +263,7 @@ const charts = {
       const completedVals = gaps.filter((x) => !x.current).map((x) => x.g);
       const maxG = Math.max(...gVals, 1);
       const minG = Math.min(...completedVals);
+      const maxCompletedG = Math.max(...completedVals);
       const avgG =
         completedVals.reduce((a, b) => a + b, 0) / completedVals.length;
 
@@ -354,10 +355,10 @@ const charts = {
 
       ctx.restore();
 
-      setText("bt-min", minG.toFixed(1) + "m");
-      setText("bt-max", Math.max(...completedVals).toFixed(1) + "m");
+      setText("bt-min", "min " + minG.toFixed(1) + "m");
+      setText("bt-max", "max " + maxCompletedG.toFixed(1) + "m");
       setText("bt-avg", "avg " + avgG.toFixed(1) + "m");
-      setText("bt-ph", "last " + completedVals.length);
+      setText("bt-ph", "last " + completedVals.length + " blocks");
     },
   },
 

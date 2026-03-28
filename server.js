@@ -701,6 +701,7 @@ async function onNewBlock() {
     _state.blocks = [newBlock, ..._state.blocks].slice(0, maxBlocks);
     if (mi) _state.mempoolInfo = mi;
     if (cts) _state.chainTxStats = cts;
+    delete _state.error;
     _state.ts = Date.now();
 
     broadcast();
