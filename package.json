@@ -1,16 +1,19 @@
 {
   "name": "blockwatch",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Real-time Bitcoin node dashboard",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "start:testnet4": "BITCOIN_RPC_PORT=48332 node server.js",
-    "start:signet":   "BITCOIN_RPC_PORT=38332 node server.js",
-    "start:regtest":  "BITCOIN_RPC_PORT=18443 node server.js"
+    "start:signet": "BITCOIN_RPC_PORT=38332 node server.js",
+    "start:regtest": "BITCOIN_RPC_PORT=18443 node server.js"
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "zeromq": "^6.5.0"
   },
   "license": "MIT"
 }

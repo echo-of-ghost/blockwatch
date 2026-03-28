@@ -1,304 +1,778 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="robots" content="noindex,nofollow">
-<meta name="description" content="blockwatch — real-time Bitcoin node dashboard">
-<title>blockwatch</title>
-<link rel="stylesheet" href="blockwatch.css">
-</head>
-<body>
-<noscript><style>.ns{display:flex;align-items:center;justify-content:center;height:100vh;background:#080808;color:#686868;font-family:monospace;font-size:12px;flex-direction:column;gap:8px}</style><div class="ns"><span>blockwatch requires javascript</span><span style="color:#404040;font-size:10px">real-time RPC polling needs JS — enable it in your browser and reload</span></div></noscript>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex,nofollow" />
+    <meta
+      name="description"
+      content="blockwatch — real-time Bitcoin node dashboard"
+    />
+    <title>blockwatch</title>
+    <link rel="stylesheet" href="blockwatch.css" />
+  </head>
+  <body>
+    <noscript
+      ><style>
+        .ns {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          height: 100vh;
+          background: #080808;
+          color: #686868;
+          font-family: monospace;
+          font-size: 12px;
+          flex-direction: column;
+          gap: 8px;
+        }
+      </style>
+      <div class="ns">
+        <span>blockwatch requires javascript</span
+        ><span style="color: #404040; font-size: 10px"
+          >real-time RPC polling needs JS — enable it in your browser and
+          reload</span
+        >
+      </div></noscript
+    >
 
-<!-- Single full-viewport container. #main fills it. All panels are position:absolute inside. -->
-<div id="app"><div id="main">
+    <!-- Single full-viewport container. #main fills it. All panels are position:absolute inside. -->
+    <div id="app">
+      <div id="main">
+        <!-- TITLEBAR PANEL — fixed chrome, not draggable -->
+        <div id="titlebar" data-panel="titlebar" role="banner">
+          <div class="tl">
+            <span class="tb-logo"><b></b>&nbsp;blockwatch</span>
+            <span class="tb-sep">│</span>
+            <span class="tb-ver-badge" id="tb-ver">—</span>
+            <span class="tb-sep">·</span>
+            <span class="tb-dim" id="tb-uptime" style="display: none"></span>
+            <span class="tb-sep" id="tb-uptime-sep" style="display: none"
+              >·</span
+            >
+            <span
+              class="tb-sync-badge"
+              id="tb-sync"
+              style="display: none"
+            ></span>
+          </div>
+          <div class="tr">
+            <span
+              class="tb-height-main"
+              id="tb-height"
+              aria-live="polite"
+              aria-label="Block height"
+              >—</span
+            >
+            <span class="tb-sep">·</span>
+            <span class="tb-clock-wrap"
+              ><span id="clock">—</span><span class="tb-utc">UTC</span></span
+            >
+            <span class="tb-sep">·</span>
 
-<!-- TITLEBAR PANEL — fixed chrome, not draggable -->
-<div id="titlebar" data-panel="titlebar" role="banner">
-  <div class="tl">
-    <span class="tb-logo"><b></b>&nbsp;blockwatch</span>
-    <span class="tb-sep">│</span>
-    <span class="tb-ver-badge" id="tb-ver">—</span>
-    <span class="tb-sep">·</span>
-    <span class="tb-dim" id="tb-uptime" style="display:none"></span>
-    <span class="tb-sep" id="tb-uptime-sep" style="display:none">·</span>
-    <span class="tb-sync-badge" id="tb-sync" style="display:none"></span>
-  </div>
-  <div class="tr">
-    <span class="tb-height-main" id="tb-height" aria-live="polite" aria-label="Block height">—</span>
-    <span class="tb-sep">·</span>
-    <span class="tb-clock-wrap"><span id="clock">—</span><span class="tb-utc">UTC</span></span>
-    <span class="tb-sep">·</span>
+            <button
+              type="button"
+              id="snapshot-btn"
+              class="ph-tsv-btn snapshot-btn"
+              aria-label="Download JSON snapshot"
+            >
+              snapshot ↓
+            </button>
+            <span
+              class="dot"
+              id="live-dot"
+              role="status"
+              aria-label="Connection status"
+            ></span>
+            <div id="restore-bar" class="rb-empty">
+              <div class="rb-inner" id="rb-chips"></div>
+            </div>
+          </div>
+        </div>
 
-    <button type="button" id="snapshot-btn" class="ph-tsv-btn snapshot-btn" aria-label="Download JSON snapshot">snapshot ↓</button>
-    <span class="dot" id="live-dot" role="status" aria-label="Connection status"></span>
-    <div id="restore-bar" class="rb-empty"><div class="rb-inner" id="rb-chips"></div></div>
-  </div>
-</div>
+        <!-- HERO PANEL — fixed chrome, not draggable -->
+        <div
+          id="hero"
+          data-panel="hero"
+          role="region"
+          aria-label="Node summary"
+        >
+          <div class="hero-cell">
+            <div
+              class="hero-val"
+              id="hero-height"
+              aria-live="polite"
+              aria-label="Block height"
+            >
+              —
+            </div>
+            <div class="hero-foot">
+              <span class="hero-lbl">block height</span
+              ><span class="hero-sub" id="hero-tip-age">—</span>
+            </div>
+          </div>
+          <div class="hero-cell">
+            <div
+              class="hero-val"
+              id="hero-fee"
+              aria-label="Next block fee in satoshis per vByte"
+            >
+              —
+            </div>
+            <div class="hero-foot">
+              <span class="hero-lbl">next block fee</span
+              ><span class="hero-sub">sat / vB</span>
+            </div>
+          </div>
+          <div class="hero-cell">
+            <div
+              class="hero-val"
+              id="hero-mempool"
+              aria-label="Mempool transaction count"
+            >
+              —
+            </div>
+            <div class="hero-foot">
+              <span class="hero-lbl">mempool</span
+              ><span class="hero-sub" id="hero-mempool-sub">—</span>
+            </div>
+          </div>
+          <div class="hero-cell">
+            <div
+              class="hero-val"
+              id="hero-peers"
+              aria-label="Connected peer count"
+            >
+              —
+            </div>
+            <div class="hero-foot">
+              <span class="hero-lbl">peers</span
+              ><span class="hero-sub" id="hero-peers-sub">—</span>
+            </div>
+          </div>
+        </div>
 
-<!-- HERO PANEL — fixed chrome, not draggable -->
-<div id="hero" data-panel="hero" role="region" aria-label="Node summary">
-  <div class="hero-cell">
-    <div class="hero-val" id="hero-height" aria-live="polite" aria-label="Block height">—</div>
-    <div class="hero-foot"><span class="hero-lbl">block height</span><span class="hero-sub" id="hero-tip-age">—</span></div>
-  </div>
-  <div class="hero-cell">
-    <div class="hero-val" id="hero-fee" aria-label="Next block fee in satoshis per vByte">—</div>
-    <div class="hero-foot"><span class="hero-lbl">next block fee</span><span class="hero-sub">sat / vB</span></div>
-  </div>
-  <div class="hero-cell">
-    <div class="hero-val" id="hero-mempool" aria-label="Mempool transaction count">—</div>
-    <div class="hero-foot"><span class="hero-lbl">mempool</span><span class="hero-sub" id="hero-mempool-sub">—</span></div>
-  </div>
-  <div class="hero-cell">
-    <div class="hero-val" id="hero-peers" aria-label="Connected peer count">—</div>
-    <div class="hero-foot"><span class="hero-lbl">peers</span><span class="hero-sub" id="hero-peers-sub">—</span></div>
-  </div>
-</div>
+        <!-- DATA PANELS — draggable, resizable -->
 
-<!-- DATA PANELS — draggable, resizable -->
+        <div class="panel" data-panel="node">
+          <div class="ph">
+            <svg
+              class="ph-drag-icon"
+              viewBox="0 0 6 10"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+            >
+              <circle cx="1.5" cy="1.5" r="1" fill="currentColor" />
+              <circle cx="4.5" cy="1.5" r="1" fill="currentColor" />
+              <circle cx="1.5" cy="5" r="1" fill="currentColor" />
+              <circle cx="4.5" cy="5" r="1" fill="currentColor" />
+              <circle cx="1.5" cy="8.5" r="1" fill="currentColor" />
+              <circle cx="4.5" cy="8.5" r="1" fill="currentColor" /></svg
+            ><span class="ph-title">node</span><span class="ph-sep">|</span
+            ><span class="ph-meta" id="ni-net">—</span>
+          </div>
+          <div class="pb">
+            <div class="sec">chain</div>
 
-<div class="panel" data-panel="node">
-  <div class="ph"><svg class="ph-drag-icon" viewBox="0 0 6 10" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="1.5" cy="1.5" r="1" fill="currentColor"/><circle cx="4.5" cy="1.5" r="1" fill="currentColor"/><circle cx="1.5" cy="5" r="1" fill="currentColor"/><circle cx="4.5" cy="5" r="1" fill="currentColor"/><circle cx="1.5" cy="8.5" r="1" fill="currentColor"/><circle cx="4.5" cy="8.5" r="1" fill="currentColor"/></svg><span class="ph-title">node</span><span class="ph-sep">|</span><span class="ph-meta" id="ni-net">—</span></div>
-  <div class="pb">
+            <div class="ni-tipage-hero">
+              <div class="ni-tipage-hero-left">
+                <span class="ni-tipage-dot" id="ni-tipage-dot"></span>
+                <span class="ni-tipage-age" id="ni-ta">—</span>
+              </div>
+              <div class="ni-tipage-hero-right">
+                <span class="ni-sync-pct" id="ni-sync">—</span>
+                <span class="ni-sync-lbl">synced</span>
+              </div>
+            </div>
 
-    <div class="sec">chain</div>
+            <div class="kv" id="ni-hd-row">
+              <span class="k">headers</span
+              ><span class="v dim" id="ni-hd">—</span>
+            </div>
+            <div class="kv">
+              <span class="k">median time</span
+              ><span class="v dim" id="ni-mt">—</span>
+            </div>
+            <div class="kv">
+              <span class="k">chain tips</span
+              ><span class="v" id="ni-tips">—</span>
+            </div>
+            <div id="ni-tips-list"></div>
 
-    <div class="ni-tipage-hero">
-      <div class="ni-tipage-hero-left">
-        <span class="ni-tipage-dot" id="ni-tipage-dot"></span>
-        <span class="ni-tipage-age" id="ni-ta">—</span>
-      </div>
-      <div class="ni-tipage-hero-right">
-        <span class="ni-sync-pct" id="ni-sync">—</span>
-        <span class="ni-sync-lbl">synced</span>
-      </div>
-    </div>
+            <div id="sync-section" style="display: none">
+              <div class="kv">
+                <span class="k">SYNC</span
+                ><span class="v" id="ni-sync-status">—</span>
+              </div>
+              <div class="sync-track">
+                <div class="sync-fill" id="sync-fill" style="width: 0%"></div>
+              </div>
+              <div class="sync-eta" id="sync-eta">—</div>
+            </div>
 
-    <div class="kv" id="ni-hd-row"><span class="k">headers</span><span class="v dim" id="ni-hd">—</span></div>
-    <div class="kv"><span class="k">median time</span><span class="v dim" id="ni-mt">—</span></div>
-    <div class="kv"><span class="k">chain tips</span><span class="v" id="ni-tips">—</span></div>
-    <div id="ni-tips-list"></div>
+            <div class="sec">network</div>
+            <div class="kv">
+              <span class="k">connections</span
+              ><span class="v v-pair"
+                ><span class="dim" id="ni-conn">—</span
+                ><span class="v-pair-sep">·</span
+                ><span class="dim" id="ni-conn-split">—</span></span
+              >
+            </div>
+            <div class="kv">
+              <span class="k">relay fee</span
+              ><span class="v dim" id="ni-rf">—</span>
+            </div>
+            <div id="ni-reachability">
+              <span class="ni-placeholder">—</span>
+            </div>
 
-    <div id="sync-section" style="display:none">
-      <div class="kv"><span class="k">SYNC</span><span class="v" id="ni-sync-status">—</span></div>
-      <div class="sync-track"><div class="sync-fill" id="sync-fill" style="width:0%"></div></div>
-      <div class="sync-eta" id="sync-eta">—</div>
-    </div>
+            <div class="sec">config</div>
+            <div class="kv ni-kv-cfg">
+              <span class="k">chain size</span
+              ><span class="v v-pair"
+                ><span id="ni-sz">—</span><span class="v-pair-sep">·</span
+                ><span class="dim" id="ni-pr">—</span></span
+              >
+            </div>
+            <div
+              class="kv ni-kv-cfg"
+              id="ni-pruneheight-row"
+              style="display: none"
+            >
+              <span class="k">prune height</span
+              ><span class="v dim" id="ni-pruneheight">—</span>
+            </div>
+            <div class="kv ni-kv-cfg">
+              <span class="k">full rbf</span
+              ><span class="v dim" id="mp-fullrbf">—</span>
+            </div>
+            <div class="kv ni-kv-cfg">
+              <span class="k dim">protocol</span
+              ><span class="v dim" id="ni-pv">—</span>
+            </div>
+            <div class="kv ni-kv-cfg">
+              <span class="k dim">rpc</span
+              ><span class="v mono" id="ni-rpc">—</span>
+            </div>
+            <div class="sec sec-row">
+              <span>reachable addresses</span
+              ><button
+                type="button"
+                class="la-toggle"
+                id="la-reveal-btn"
+                aria-label="Toggle local address visibility"
+              >
+                reveal
+              </button>
+            </div>
+            <div id="ni-localaddrs"><span class="ni-placeholder">—</span></div>
+          </div>
+        </div>
 
-    <div class="sec">mempool</div>
-    <div id="mp-loading-row" style="display:none"><div class="kv"><span class="k">loaded</span><span class="v" id="mp-loaded">—</span></div></div>
-    <div class="kv"><span class="k">txs · size</span><span class="v v-pair"><span id="mp-txs">—</span><span class="v-pair-sep">·</span><span class="dim" id="mp-sz">—</span></span></div>
-    <div class="kv ni-kv-bar"><span class="k">usage</span><span class="v dim" id="mp-us">—</span></div>
-    <div class="ni-mp-bar-wrap">
-      <div class="mtrack"><div class="mfill o" id="mp-usage-fill" style="width:0%"></div></div>
-    </div>
-    <div class="kv"><span class="k">min fee · total</span><span class="v v-pair"><span class="o" id="mp-mf">—</span><span class="v-pair-sep">·</span><span class="dim" id="mp-tf">—</span></span></div>
-    <div class="kv" id="mp-relay-fee-row"><span class="k">relay · incr. fee</span><span class="v v-pair"><span class="dim" id="mp-rf">—</span><span class="v-pair-sep">·</span><span class="dim" id="mp-incrf">—</span></span></div>
-    <div class="kv"><span class="k">unbroadcast</span><span class="v" id="mp-unconf">—</span></div>
+        <div class="panel" id="p-col2-top" data-panel="chain">
+          <div class="ph">
+            <svg
+              class="ph-drag-icon"
+              viewBox="0 0 6 10"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+            >
+              <circle cx="1.5" cy="1.5" r="1" fill="currentColor" />
+              <circle cx="4.5" cy="1.5" r="1" fill="currentColor" />
+              <circle cx="1.5" cy="5" r="1" fill="currentColor" />
+              <circle cx="4.5" cy="5" r="1" fill="currentColor" />
+              <circle cx="1.5" cy="8.5" r="1" fill="currentColor" />
+              <circle cx="4.5" cy="8.5" r="1" fill="currentColor" /></svg
+            ><span class="ph-title">chain</span><span class="ph-sep">|</span
+            ><span class="ph-meta" id="ch-tip-age">—</span>
+          </div>
+          <div class="pb">
+            <div class="sec">bandwidth</div>
+            <div class="bw-live-row">
+              <div class="bw-live-item">
+                <span class="bw-live-arrow bw-live-recv">▼</span>
+                <span class="bw-live-val" id="bw-dn-v">—</span>
+                <span class="bw-live-lbl">recv</span>
+              </div>
+              <div class="bw-live-item">
+                <span class="bw-live-arrow bw-live-sent">▲</span>
+                <span class="bw-live-val" id="bw-up-v">—</span>
+                <span class="bw-live-lbl">sent</span>
+              </div>
+            </div>
+            <div class="bw-chart-wrap">
+              <canvas
+                id="spark"
+                style="display: block; cursor: crosshair"
+              ></canvas>
+            </div>
+            <div class="kv">
+              <span class="k" data-tip="sent · recv">recv total</span
+              ><span class="v dim" id="bw-rv">—</span>
+            </div>
+            <div class="kv">
+              <span class="k" data-tip="sent · recv">sent total</span
+              ><span class="v dim" id="bw-sn">—</span>
+            </div>
+            <div class="sec">fee estimates (sat/vB)</div>
+            <div id="fee-rows"></div>
+          </div>
+        </div>
 
-    <div class="sec">network</div>
-    <div class="kv"><span class="k">connections</span><span class="v v-pair"><span class="dim" id="ni-conn">—</span><span class="v-pair-sep">·</span><span class="dim" id="ni-conn-split">—</span></span></div>
-    <div class="kv"><span class="k">relay fee</span><span class="v dim" id="ni-rf">—</span></div>
-    <div id="ni-reachability"><span class="ni-placeholder">—</span></div>
+        <div class="panel" id="p-col2-subsidy" data-panel="mempool-viz">
+          <div class="ph">
+            <svg
+              class="ph-drag-icon"
+              viewBox="0 0 6 10"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+            >
+              <circle cx="1.5" cy="1.5" r="1" fill="currentColor" />
+              <circle cx="4.5" cy="1.5" r="1" fill="currentColor" />
+              <circle cx="1.5" cy="5" r="1" fill="currentColor" />
+              <circle cx="4.5" cy="5" r="1" fill="currentColor" />
+              <circle cx="1.5" cy="8.5" r="1" fill="currentColor" />
+              <circle cx="4.5" cy="8.5" r="1" fill="currentColor" /></svg
+            ><span class="ph-title">mempool</span
+            ><span class="ph-sep">|</span
+            ><span class="ph-meta" id="mp-ph">—</span>
+          </div>
+          <div class="pb" id="mp-body">
+            <!-- canvas and legend rendered by mempoolPanel inside bd-body -->
+          </div>
+        </div>
 
-    <div class="sec">config</div>
-    <div class="kv ni-kv-cfg"><span class="k">chain size</span><span class="v v-pair"><span id="ni-sz">—</span><span class="v-pair-sep">·</span><span class="dim" id="ni-pr">—</span></span></div>
-    <div class="kv ni-kv-cfg" id="ni-pruneheight-row" style="display:none"><span class="k">prune height</span><span class="v dim" id="ni-pruneheight">—</span></div>
-    <div class="kv ni-kv-cfg"><span class="k">full rbf</span><span class="v dim" id="mp-fullrbf">—</span></div>
-    <div class="kv ni-kv-cfg"><span class="k dim">protocol</span><span class="v dim" id="ni-pv">—</span></div>
-    <div class="kv ni-kv-cfg"><span class="k dim">rpc</span><span class="v mono" id="ni-rpc">—</span></div>
-    <div class="sec sec-row"><span>reachable addresses</span><button type="button" class="la-toggle" id="la-reveal-btn" aria-label="Toggle local address visibility">reveal</button></div>
-    <div id="ni-localaddrs"><span class="ni-placeholder">—</span></div>
-  </div>
-</div>
+        <div class="panel" id="p-col2-mid" data-panel="block-timing">
+          <div class="ph">
+            <svg
+              class="ph-drag-icon"
+              viewBox="0 0 6 10"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+            >
+              <circle cx="1.5" cy="1.5" r="1" fill="currentColor" />
+              <circle cx="4.5" cy="1.5" r="1" fill="currentColor" />
+              <circle cx="1.5" cy="5" r="1" fill="currentColor" />
+              <circle cx="4.5" cy="5" r="1" fill="currentColor" />
+              <circle cx="1.5" cy="8.5" r="1" fill="currentColor" />
+              <circle cx="4.5" cy="8.5" r="1" fill="currentColor" /></svg
+            ><span class="ph-title">block timing</span
+            ><span class="ph-sep">|</span
+            ><span class="ph-meta" id="bt-ph">last 12</span>
+          </div>
+          <div class="pb pb-chart">
+            <canvas id="bt-canvas" style="width: 100%; display: block"></canvas>
+            <div class="chart-leg">
+              <span class="chart-leg-min" id="bt-min">—</span
+              ><span class="chart-leg-avg" id="bt-avg">avg —</span
+              ><span class="chart-leg-max" id="bt-max">—</span>
+            </div>
+          </div>
+        </div>
 
-<div class="panel" id="p-col2-top" data-panel="chain">
-  <div class="ph"><svg class="ph-drag-icon" viewBox="0 0 6 10" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="1.5" cy="1.5" r="1" fill="currentColor"/><circle cx="4.5" cy="1.5" r="1" fill="currentColor"/><circle cx="1.5" cy="5" r="1" fill="currentColor"/><circle cx="4.5" cy="5" r="1" fill="currentColor"/><circle cx="1.5" cy="8.5" r="1" fill="currentColor"/><circle cx="4.5" cy="8.5" r="1" fill="currentColor"/></svg><span class="ph-title">chain</span><span class="ph-sep">|</span><span class="ph-meta" id="ch-tip-age">—</span></div>
-  <div class="pb">
-    <div class="sec">bandwidth</div>
-    <div class="bw-live-row">
-      <div class="bw-live-item">
-        <span class="bw-live-arrow bw-live-recv">▼</span>
-        <span class="bw-live-val" id="bw-dn-v">—</span>
-        <span class="bw-live-lbl">recv</span>
-      </div>
-      <div class="bw-live-item">
-        <span class="bw-live-arrow bw-live-sent">▲</span>
-        <span class="bw-live-val" id="bw-up-v">—</span>
-        <span class="bw-live-lbl">sent</span>
-      </div>
-    </div>
-    <div class="bw-chart-wrap">
-      <canvas id="spark" style="display:block;cursor:crosshair"></canvas>
-    </div>
-    <div class="kv"><span class="k" data-tip="sent · recv">recv total</span><span class="v dim" id="bw-rv">—</span></div>
-    <div class="kv"><span class="k" data-tip="sent · recv">sent total</span><span class="v dim" id="bw-sn">—</span></div>
-    <div class="sec">fee estimates (sat/vB)</div>
-    <div id="fee-rows"></div>
-  </div>
-</div>
+        <div class="panel" id="p-col3-top" data-panel="blocks">
+          <div class="ph">
+            <svg
+              class="ph-drag-icon"
+              viewBox="0 0 6 10"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+            >
+              <circle cx="1.5" cy="1.5" r="1" fill="currentColor" />
+              <circle cx="4.5" cy="1.5" r="1" fill="currentColor" />
+              <circle cx="1.5" cy="5" r="1" fill="currentColor" />
+              <circle cx="4.5" cy="5" r="1" fill="currentColor" />
+              <circle cx="1.5" cy="8.5" r="1" fill="currentColor" />
+              <circle cx="4.5" cy="8.5" r="1" fill="currentColor" /></svg
+            ><span class="ph-title">blocks</span><span class="ph-sep">|</span
+            ><span class="ph-meta" id="blk-ph">—</span>
+          </div>
+          <div class="scroll-area">
+            <table class="tbl" aria-label="Recent blocks">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>hash</th>
+                  <th>txs</th>
+                  <th>fill</th>
+                  <th>age</th>
+                </tr>
+              </thead>
+              <tbody id="blk-body"></tbody>
+            </table>
+          </div>
+        </div>
 
-<div class="panel" id="p-col2-heatmap" data-panel="fee-distribution">
-  <div class="ph"><svg class="ph-drag-icon" viewBox="0 0 6 10" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="1.5" cy="1.5" r="1" fill="currentColor"/><circle cx="4.5" cy="1.5" r="1" fill="currentColor"/><circle cx="1.5" cy="5" r="1" fill="currentColor"/><circle cx="4.5" cy="5" r="1" fill="currentColor"/><circle cx="1.5" cy="8.5" r="1" fill="currentColor"/><circle cx="4.5" cy="8.5" r="1" fill="currentColor"/></svg><span class="ph-title">fee distribution</span><span class="ph-sep">|</span><span class="ph-meta" id="fh-ph">last 12 blocks</span></div>
-  <div class="pb pb-chart"><canvas id="fee-ridge-canvas" style="width:100%;display:block"></canvas></div>
-</div>
+        <div class="panel" id="p-col3-mid" data-panel="block-detail">
+          <div class="ph">
+            <svg
+              class="ph-drag-icon"
+              viewBox="0 0 6 10"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+            >
+              <circle cx="1.5" cy="1.5" r="1" fill="currentColor" />
+              <circle cx="4.5" cy="1.5" r="1" fill="currentColor" />
+              <circle cx="1.5" cy="5" r="1" fill="currentColor" />
+              <circle cx="4.5" cy="5" r="1" fill="currentColor" />
+              <circle cx="1.5" cy="8.5" r="1" fill="currentColor" />
+              <circle cx="4.5" cy="8.5" r="1" fill="currentColor" /></svg
+            ><span class="ph-title">block</span><span class="ph-sep">|</span
+            ><span class="ph-meta" id="bd-ph">latest</span>
+          </div>
+          <div class="pb" id="block-detail-body">
+            <div class="kv">
+              <span class="k">height</span><span class="v dim">—</span>
+            </div>
+            <div class="kv">
+              <span class="k">hash</span><span class="v dim">—</span>
+            </div>
+            <div class="kv">
+              <span class="k">age · txs</span><span class="v dim">—</span>
+            </div>
+            <div class="kv">
+              <span class="k">in · out</span><span class="v dim">—</span>
+            </div>
+            <div class="kv">
+              <span class="k">size · fill</span><span class="v dim">—</span>
+            </div>
+            <div class="kv">
+              <span class="k">avg · total fee</span><span class="v dim">—</span>
+            </div>
+            <div class="kv">
+              <span class="k">subsidy · era</span><span class="v dim">—</span>
+            </div>
+            <div class="kv">
+              <span class="k">fee share</span><span class="v dim">—</span>
+            </div>
+            <div class="kv">
+              <span class="k" data-tip="signalling">signalling</span
+              ><span class="v dim">—</span>
+            </div>
+            <div class="kv">
+              <span class="k">version · bits</span><span class="v dim">—</span>
+            </div>
+            <div class="kv">
+              <span class="k">median time</span><span class="v dim">—</span>
+            </div>
+          </div>
+        </div>
 
-<div class="panel" id="p-col2-subsidy" data-panel="fee-subsidy">
-  <div class="ph"><svg class="ph-drag-icon" viewBox="0 0 6 10" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="1.5" cy="1.5" r="1" fill="currentColor"/><circle cx="4.5" cy="1.5" r="1" fill="currentColor"/><circle cx="1.5" cy="5" r="1" fill="currentColor"/><circle cx="4.5" cy="5" r="1" fill="currentColor"/><circle cx="1.5" cy="8.5" r="1" fill="currentColor"/><circle cx="4.5" cy="8.5" r="1" fill="currentColor"/></svg><span class="ph-title">fee / subsidy</span><span class="ph-sep">|</span><span class="ph-meta" id="fs-ph">mining revenue mix</span></div>
-  <div class="pb pb-chart">
-    <canvas id="fs-canvas" style="width:100%;display:block"></canvas>
-    <div class="chart-leg"><span class="chart-leg-min" id="fs-min">—</span><span class="chart-leg-avg" id="fs-avg">avg —</span><span class="chart-leg-max" id="fs-max">—</span></div>
-  </div>
-</div>
+        <div class="panel" id="p-col3-bot" data-panel="mining">
+          <div class="ph">
+            <svg
+              class="ph-drag-icon"
+              viewBox="0 0 6 10"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+            >
+              <circle cx="1.5" cy="1.5" r="1" fill="currentColor" />
+              <circle cx="4.5" cy="1.5" r="1" fill="currentColor" />
+              <circle cx="1.5" cy="5" r="1" fill="currentColor" />
+              <circle cx="4.5" cy="5" r="1" fill="currentColor" />
+              <circle cx="1.5" cy="8.5" r="1" fill="currentColor" />
+              <circle cx="4.5" cy="8.5" r="1" fill="currentColor" /></svg
+            ><span class="ph-title">mining</span><span class="ph-sep">|</span
+            ><span class="ph-meta" id="mn-ph">—</span>
+          </div>
+          <div class="pb">
+            <div class="kv">
+              <span class="k">diff · hashrate</span
+              ><span class="v v-pair"
+                ><span class="dim" id="mn-df">—</span
+                ><span class="v-pair-sep">·</span
+                ><span class="o" id="mn-hr">—</span></span
+              >
+            </div>
+            <div class="kv">
+              <span class="k dim">chainwork</span
+              ><span class="v mono v-copyable"
+                ><span id="mn-cw">—</span
+                ><span id="mn-cw-copy" data-copy="" class="copy-icon"
+                  >⎘</span
+                ></span
+              >
+            </div>
+            <div class="kv">
+              <span class="k">tx/s (2w) · total</span
+              ><span class="v v-pair"
+                ><span class="dim" id="mn-tps">—</span
+                ><span class="v-pair-sep">·</span
+                ><span class="dim" id="mn-ttx">—</span></span
+              >
+            </div>
+            <div class="sec">retarget</div>
+            <div class="mn-epoch-wrap">
+              <div
+                class="mn-epoch-track"
+                id="mn-epoch-track"
+                aria-label="Epoch progress"
+                role="meter"
+                aria-valuemin="0"
+                aria-valuemax="2016"
+              >
+                <div
+                  class="mn-epoch-fill"
+                  id="mn-epoch-fill"
+                  style="width: 0%"
+                ></div>
+                <div class="mn-epoch-ticks" aria-hidden="true">
+                  <span></span><span></span><span></span>
+                </div>
+              </div>
+              <div class="mn-epoch-tick-labels" aria-hidden="true">
+                <span>504</span><span>1008</span><span>1512</span>
+              </div>
+              <div class="mn-epoch-labels">
+                <span class="mn-epoch-start">0</span>
+                <span class="mn-epoch-pct" id="mn-epoch-pct">—</span>
+                <span class="mn-epoch-end">2016</span>
+              </div>
+            </div>
+            <div class="kv">
+              <span class="k">block · left</span
+              ><span class="v v-pair"
+                ><span id="mn-rt-blk">—</span><span class="v-pair-sep">·</span
+                ><span class="dim" id="mn-rt-left">—</span></span
+              >
+            </div>
+            <div class="kv">
+              <span class="k">est. date</span
+              ><span class="v dim" id="mn-rt-date">—</span>
+            </div>
+            <div class="kv">
+              <span class="k">adj · avg</span
+              ><span class="v v-pair"
+                ><span id="mn-rt-chg">—</span><span class="v-pair-sep">·</span
+                ><span class="dim" id="mn-rt-avg">—</span></span
+              >
+            </div>
+          </div>
+        </div>
 
-<div class="panel" id="p-col2-mid" data-panel="block-timing">
-  <div class="ph"><svg class="ph-drag-icon" viewBox="0 0 6 10" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="1.5" cy="1.5" r="1" fill="currentColor"/><circle cx="4.5" cy="1.5" r="1" fill="currentColor"/><circle cx="1.5" cy="5" r="1" fill="currentColor"/><circle cx="4.5" cy="5" r="1" fill="currentColor"/><circle cx="1.5" cy="8.5" r="1" fill="currentColor"/><circle cx="4.5" cy="8.5" r="1" fill="currentColor"/></svg><span class="ph-title">block timing</span><span class="ph-sep">|</span><span class="ph-meta" id="bt-ph">last 12</span></div>
-  <div class="pb pb-chart">
-    <canvas id="bt-canvas" style="width:100%;display:block"></canvas>
-    <div class="chart-leg"><span class="chart-leg-min" id="bt-min">—</span><span class="chart-leg-avg" id="bt-avg">avg —</span><span class="chart-leg-max" id="bt-max">—</span></div>
-  </div>
-</div>
+        <div class="panel" id="p-col4-top" data-panel="peers">
+          <div class="ph">
+            <svg
+              class="ph-drag-icon"
+              viewBox="0 0 6 10"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+            >
+              <circle cx="1.5" cy="1.5" r="1" fill="currentColor" />
+              <circle cx="4.5" cy="1.5" r="1" fill="currentColor" />
+              <circle cx="1.5" cy="5" r="1" fill="currentColor" />
+              <circle cx="4.5" cy="5" r="1" fill="currentColor" />
+              <circle cx="1.5" cy="8.5" r="1" fill="currentColor" />
+              <circle cx="4.5" cy="8.5" r="1" fill="currentColor" /></svg
+            ><span class="ph-title">peers</span><span class="ph-sep">|</span
+            ><span class="ph-meta ph-meta-fixed" id="peer-in-ph">—</span
+            ><span class="ph-meta-sep">·</span
+            ><span class="ph-meta ph-meta-fixed" id="peer-out-ph">—</span
+            ><span class="ph-right"
+              ><button
+                type="button"
+                id="peers-tsv-btn"
+                class="ph-tsv-btn"
+                aria-label="Export peers as TSV"
+              >
+                peers ↓
+              </button></span
+            >
+          </div>
+          <div class="peer-filter-wrap">
+            <input
+              type="text"
+              id="peer-filter"
+              class="peer-filter-input"
+              placeholder="/ filter by address, version, network…"
+              aria-label="Filter peers"
+            />
+          </div>
+          <div class="scroll-area">
+            <table class="tbl" id="peer-tbl" aria-label="Connected peers">
+              <thead>
+                <tr>
+                  <th>address</th>
+                  <th class="td-r" style="width: 64px">ping</th>
+                </tr>
+              </thead>
+              <tbody id="peer-table-body"></tbody>
+            </table>
+          </div>
+        </div>
 
-<div class="panel" id="p-col3-top" data-panel="blocks">
-  <div class="ph"><svg class="ph-drag-icon" viewBox="0 0 6 10" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="1.5" cy="1.5" r="1" fill="currentColor"/><circle cx="4.5" cy="1.5" r="1" fill="currentColor"/><circle cx="1.5" cy="5" r="1" fill="currentColor"/><circle cx="4.5" cy="5" r="1" fill="currentColor"/><circle cx="1.5" cy="8.5" r="1" fill="currentColor"/><circle cx="4.5" cy="8.5" r="1" fill="currentColor"/></svg><span class="ph-title">blocks</span><span class="ph-sep">|</span><span class="ph-meta" id="blk-ph">—</span></div>
-  <div class="scroll-area">
-    <table class="tbl" aria-label="Recent blocks">
-      <thead><tr><th>#</th><th>hash</th><th>txs</th><th>fill</th><th>age</th></tr></thead>
-      <tbody id="blk-body"></tbody>
-    </table>
-  </div>
-</div>
+        <div class="panel" id="p-col4-mid" data-panel="banned">
+          <div class="ph">
+            <svg
+              class="ph-drag-icon"
+              viewBox="0 0 6 10"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+            >
+              <circle cx="1.5" cy="1.5" r="1" fill="currentColor" />
+              <circle cx="4.5" cy="1.5" r="1" fill="currentColor" />
+              <circle cx="1.5" cy="5" r="1" fill="currentColor" />
+              <circle cx="4.5" cy="5" r="1" fill="currentColor" />
+              <circle cx="1.5" cy="8.5" r="1" fill="currentColor" />
+              <circle cx="4.5" cy="8.5" r="1" fill="currentColor" /></svg
+            ><span class="ph-title">banned</span><span class="ph-sep">|</span
+            ><span class="ph-meta" id="ban-ph">—</span>
+          </div>
+          <div class="scroll-area pb" id="ban-rows">
+            <div class="ban-empty">no bans</div>
+          </div>
+        </div>
 
-<div class="panel" id="p-col3-mid" data-panel="block-detail">
-  <div class="ph"><svg class="ph-drag-icon" viewBox="0 0 6 10" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="1.5" cy="1.5" r="1" fill="currentColor"/><circle cx="4.5" cy="1.5" r="1" fill="currentColor"/><circle cx="1.5" cy="5" r="1" fill="currentColor"/><circle cx="4.5" cy="5" r="1" fill="currentColor"/><circle cx="1.5" cy="8.5" r="1" fill="currentColor"/><circle cx="4.5" cy="8.5" r="1" fill="currentColor"/></svg><span class="ph-title">block</span><span class="ph-sep">|</span><span class="ph-meta" id="bd-ph">latest</span></div>
-  <div class="pb" id="block-detail-body">
-    <div class="kv"><span class="k">height</span><span class="v dim">—</span></div>
-    <div class="kv"><span class="k">hash</span><span class="v dim">—</span></div>
-    <div class="kv"><span class="k">age · txs</span><span class="v dim">—</span></div>
-    <div class="kv"><span class="k">in · out</span><span class="v dim">—</span></div>
-    <div class="kv"><span class="k">size · fill</span><span class="v dim">—</span></div>
-    <div class="kv"><span class="k">avg · total fee</span><span class="v dim">—</span></div>
-    <div class="kv"><span class="k">subsidy · era</span><span class="v dim">—</span></div>
-    <div class="kv"><span class="k">fee share</span><span class="v dim">—</span></div>
-    <div class="kv"><span class="k" data-tip="signalling">signalling</span><span class="v dim">—</span></div>
-    <div class="kv"><span class="k">version · bits</span><span class="v dim">—</span></div>
-    <div class="kv"><span class="k">median time</span><span class="v dim">—</span></div>
-  </div>
-</div>
+        <div class="panel" id="p-col4-svc" data-panel="services">
+          <div class="ph">
+            <svg
+              class="ph-drag-icon"
+              viewBox="0 0 6 10"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+            >
+              <circle cx="1.5" cy="1.5" r="1" fill="currentColor" />
+              <circle cx="4.5" cy="1.5" r="1" fill="currentColor" />
+              <circle cx="1.5" cy="5" r="1" fill="currentColor" />
+              <circle cx="4.5" cy="5" r="1" fill="currentColor" />
+              <circle cx="1.5" cy="8.5" r="1" fill="currentColor" />
+              <circle cx="4.5" cy="8.5" r="1" fill="currentColor" /></svg
+            ><span class="ph-title">services</span><span class="ph-sep">|</span
+            ><span class="ph-meta" id="svc-ph">—</span>
+          </div>
+          <div class="pb"><div class="svc-grid" id="svc-grid"></div></div>
+        </div>
 
-<div class="panel" id="p-col3-bot" data-panel="mining">
-  <div class="ph"><svg class="ph-drag-icon" viewBox="0 0 6 10" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="1.5" cy="1.5" r="1" fill="currentColor"/><circle cx="4.5" cy="1.5" r="1" fill="currentColor"/><circle cx="1.5" cy="5" r="1" fill="currentColor"/><circle cx="4.5" cy="5" r="1" fill="currentColor"/><circle cx="1.5" cy="8.5" r="1" fill="currentColor"/><circle cx="4.5" cy="8.5" r="1" fill="currentColor"/></svg><span class="ph-title">mining</span><span class="ph-sep">|</span><span class="ph-meta" id="mn-ph">—</span></div>
-  <div class="pb">
-    <div class="kv"><span class="k">diff · hashrate</span><span class="v v-pair"><span class="dim" id="mn-df">—</span><span class="v-pair-sep">·</span><span class="o" id="mn-hr">—</span></span></div>
-    <div class="kv"><span class="k dim">chainwork</span><span class="v mono v-copyable"><span id="mn-cw">—</span><span id="mn-cw-copy" data-copy="" class="copy-icon">⎘</span></span></div>
-    <div class="kv"><span class="k">tx/s (2w) · total</span><span class="v v-pair"><span class="dim" id="mn-tps">—</span><span class="v-pair-sep">·</span><span class="dim" id="mn-ttx">—</span></span></div>
-    <div class="sec">retarget</div>
-    <div class="mn-epoch-wrap">
-      <div class="mn-epoch-track" id="mn-epoch-track" aria-label="Epoch progress" role="meter" aria-valuemin="0" aria-valuemax="2016">
-        <div class="mn-epoch-fill" id="mn-epoch-fill" style="width:0%"></div>
-        <div class="mn-epoch-ticks" aria-hidden="true">
-          <span></span><span></span><span></span>
+        <div class="panel" id="p-col4-bot" data-panel="peer-detail">
+          <div class="ph">
+            <svg
+              class="ph-drag-icon"
+              viewBox="0 0 6 10"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+            >
+              <circle cx="1.5" cy="1.5" r="1" fill="currentColor" />
+              <circle cx="4.5" cy="1.5" r="1" fill="currentColor" />
+              <circle cx="1.5" cy="5" r="1" fill="currentColor" />
+              <circle cx="4.5" cy="5" r="1" fill="currentColor" />
+              <circle cx="1.5" cy="8.5" r="1" fill="currentColor" />
+              <circle cx="4.5" cy="8.5" r="1" fill="currentColor" /></svg
+            ><span class="ph-title">peer detail</span
+            ><span class="ph-sep">|</span
+            ><span class="ph-meta" id="pd-ph">—</span>
+          </div>
+          <div
+            class="pb"
+            id="peer-detail-body"
+            role="region"
+            aria-label="Peer detail"
+          >
+            <div class="pd-empty">click a peer to inspect</div>
+          </div>
+        </div>
+
+        <!-- STATUSBAR PANEL — fixed chrome, not draggable -->
+        <div id="statusbar" data-panel="statusbar" role="status">
+          <div class="sb-left">
+            <span
+              class="sb-err"
+              id="sb-err"
+              role="alert"
+              aria-live="polite"
+            ></span>
+          </div>
         </div>
       </div>
-      <div class="mn-epoch-tick-labels" aria-hidden="true">
-        <span>504</span><span>1008</span><span>1512</span>
+      <!-- #main -->
+    </div>
+    <!-- #app -->
+
+    <!-- MOBILE TITLEBAR -->
+    <div id="mobile-bar" role="banner" aria-label="blockwatch mobile header">
+      <div class="mb-left">
+        <span class="tb-logo"><b></b>&nbsp;blockwatch</span>
+        <span class="mb-ver-group">
+          <span class="tb-sep">│</span>
+          <span class="tb-ver-badge" id="mb-ver">—</span>
+        </span>
+        <span class="tb-sep" id="mb-uptime-sep" style="display: none">·</span>
+        <span class="tb-dim" id="mb-uptime" style="display: none"></span>
+        <span class="tb-sync-badge" id="mb-sync" style="display: none"></span>
       </div>
-      <div class="mn-epoch-labels">
-        <span class="mn-epoch-start">0</span>
-        <span class="mn-epoch-pct" id="mn-epoch-pct">—</span>
-        <span class="mn-epoch-end">2016</span>
+      <div class="mb-right">
+        <span class="tb-height-main" id="mb-height" aria-live="polite">—</span>
+        <span class="tb-sep" id="mb-clock-sep">·</span>
+        <span class="tb-clock-wrap" id="mb-clock-wrap"
+          ><span id="mb-clock">—</span><span class="tb-utc">UTC</span></span
+        >
+        <span
+          class="dot"
+          id="mb-dot"
+          role="status"
+          aria-label="Connection status"
+        ></span>
       </div>
     </div>
-    <div class="kv"><span class="k">block · left</span><span class="v v-pair"><span id="mn-rt-blk">—</span><span class="v-pair-sep">·</span><span class="dim" id="mn-rt-left">—</span></span></div>
-    <div class="kv"><span class="k">est. date</span><span class="v dim" id="mn-rt-date">—</span></div>
-    <div class="kv"><span class="k">adj · avg</span><span class="v v-pair"><span id="mn-rt-chg">—</span><span class="v-pair-sep">·</span><span class="dim" id="mn-rt-avg">—</span></span></div>
-  </div>
-</div>
 
-<div class="panel" id="p-col4-top" data-panel="peers">
-  <div class="ph"><svg class="ph-drag-icon" viewBox="0 0 6 10" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="1.5" cy="1.5" r="1" fill="currentColor"/><circle cx="4.5" cy="1.5" r="1" fill="currentColor"/><circle cx="1.5" cy="5" r="1" fill="currentColor"/><circle cx="4.5" cy="5" r="1" fill="currentColor"/><circle cx="1.5" cy="8.5" r="1" fill="currentColor"/><circle cx="4.5" cy="8.5" r="1" fill="currentColor"/></svg><span class="ph-title">peers</span><span class="ph-sep">|</span><span class="ph-meta ph-meta-fixed" id="peer-in-ph">—</span><span class="ph-meta-sep">·</span><span class="ph-meta ph-meta-fixed" id="peer-out-ph">—</span><span class="ph-right"><button type="button" id="peers-tsv-btn" class="ph-tsv-btn" aria-label="Export peers as TSV">peers ↓</button></span></div>
-  <div class="peer-filter-wrap">
-    <input type="text" id="peer-filter" class="peer-filter-input" placeholder="/ filter by address, version, network…" aria-label="Filter peers">
-  </div>
-  <div class="scroll-area">
-    <table class="tbl" id="peer-tbl" aria-label="Connected peers">
-      <thead><tr><th>address</th><th class="td-r" style="width:64px">ping</th></tr></thead>
-      <tbody id="peer-table-body"></tbody>
-    </table>
-  </div>
-</div>
+    <!-- CONNECTING OVERLAY -->
+    <div id="connecting" role="alert" aria-live="assertive">
+      <div class="c-bg-grid" aria-hidden="true"></div>
+      <div class="c-inner">
+        <div class="c-logo-mark" aria-hidden="true"></div>
+        <span class="c-wordmark">blockwatch</span>
+        <span class="c-msg" id="conn-msg">connecting to bitcoind…</span>
+        <span class="c-countdown" id="conn-countdown"></span>
+        <button
+          type="button"
+          class="c-retry"
+          id="conn-retry"
+          style="display: none"
+          aria-label="Retry connection"
+        >
+          retry now
+        </button>
+      </div>
+    </div>
 
-<div class="panel" id="p-col4-mid" data-panel="banned">
-  <div class="ph"><svg class="ph-drag-icon" viewBox="0 0 6 10" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="1.5" cy="1.5" r="1" fill="currentColor"/><circle cx="4.5" cy="1.5" r="1" fill="currentColor"/><circle cx="1.5" cy="5" r="1" fill="currentColor"/><circle cx="4.5" cy="5" r="1" fill="currentColor"/><circle cx="1.5" cy="8.5" r="1" fill="currentColor"/><circle cx="4.5" cy="8.5" r="1" fill="currentColor"/></svg><span class="ph-title">banned</span><span class="ph-sep">|</span><span class="ph-meta" id="ban-ph">—</span></div>
-  <div class="scroll-area pb" id="ban-rows"><div class="ban-empty">no bans</div></div>
-</div>
+    <div id="node-warnings" role="alert" aria-live="polite"></div>
+    <span
+      class="sb-stale"
+      id="sb-stale"
+      role="status"
+      aria-live="polite"
+    ></span>
 
-<div class="panel" id="p-col4-svc" data-panel="services">
-  <div class="ph"><svg class="ph-drag-icon" viewBox="0 0 6 10" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="1.5" cy="1.5" r="1" fill="currentColor"/><circle cx="4.5" cy="1.5" r="1" fill="currentColor"/><circle cx="1.5" cy="5" r="1" fill="currentColor"/><circle cx="4.5" cy="5" r="1" fill="currentColor"/><circle cx="1.5" cy="8.5" r="1" fill="currentColor"/><circle cx="4.5" cy="8.5" r="1" fill="currentColor"/></svg><span class="ph-title">services</span><span class="ph-sep">|</span><span class="ph-meta" id="svc-ph">—</span></div>
-  <div class="pb"><div class="svc-grid" id="svc-grid"></div></div>
-</div>
+    <!-- TOOLTIP -->
+    <div id="bw-tooltip" role="tooltip"></div>
 
-<div class="panel" id="p-col4-bot" data-panel="peer-detail">
-  <div class="ph"><svg class="ph-drag-icon" viewBox="0 0 6 10" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="1.5" cy="1.5" r="1" fill="currentColor"/><circle cx="4.5" cy="1.5" r="1" fill="currentColor"/><circle cx="1.5" cy="5" r="1" fill="currentColor"/><circle cx="4.5" cy="5" r="1" fill="currentColor"/><circle cx="1.5" cy="8.5" r="1" fill="currentColor"/><circle cx="4.5" cy="8.5" r="1" fill="currentColor"/></svg><span class="ph-title">peer detail</span><span class="ph-sep">|</span><span class="ph-meta" id="pd-ph">—</span></div>
-  <div class="pb" id="peer-detail-body" role="region" aria-label="Peer detail"><div class="pd-empty">click a peer to inspect</div></div>
-</div>
+    <!-- TOAST STACK -->
+    <div id="toast-stack" aria-live="polite" aria-label="Notifications"></div>
 
-<!-- STATUSBAR PANEL — fixed chrome, not draggable -->
-<div id="statusbar" data-panel="statusbar" role="status">
-  <div class="sb-left">
-    <span class="sb-err" id="sb-err" role="alert" aria-live="polite"></span>
-  </div>
-</div>
+    <!-- CONTEXT MENU -->
+    <div id="ctx-menu" style="display: none"></div>
 
-</div><!-- #main --></div><!-- #app -->
-
-<!-- MOBILE TITLEBAR -->
-<div id="mobile-bar" role="banner" aria-label="blockwatch mobile header">
-  <div class="mb-left">
-    <span class="tb-logo"><b></b>&nbsp;blockwatch</span>
-    <span class="mb-ver-group">
-      <span class="tb-sep">│</span>
-      <span class="tb-ver-badge" id="mb-ver">—</span>
-    </span>
-    <span class="tb-sep" id="mb-uptime-sep" style="display:none">·</span>
-    <span class="tb-dim" id="mb-uptime" style="display:none"></span>
-    <span class="tb-sync-badge" id="mb-sync" style="display:none"></span>
-  </div>
-  <div class="mb-right">
-    <span class="tb-height-main" id="mb-height" aria-live="polite">—</span>
-    <span class="tb-sep" id="mb-clock-sep">·</span>
-    <span class="tb-clock-wrap" id="mb-clock-wrap"><span id="mb-clock">—</span><span class="tb-utc">UTC</span></span>
-    <span class="dot" id="mb-dot" role="status" aria-label="Connection status"></span>
-  </div>
-</div>
-
-<!-- CONNECTING OVERLAY -->
-<div id="connecting" role="alert" aria-live="assertive">
-  <div class="c-bg-grid" aria-hidden="true"></div>
-  <div class="c-inner">
-    <div class="c-logo-mark" aria-hidden="true"></div>
-    <span class="c-wordmark">blockwatch</span>
-    <span class="c-msg" id="conn-msg">connecting to bitcoind…</span>
-    <span class="c-countdown" id="conn-countdown"></span>
-    <button type="button" class="c-retry" id="conn-retry" style="display:none" aria-label="Retry connection">retry now</button>
-  </div>
-</div>
-
-<div id="node-warnings" role="alert" aria-live="polite"></div>
-<span class="sb-stale" id="sb-stale" role="status" aria-live="polite"></span>
-
-
-<!-- TOOLTIP -->
-<div id="bw-tooltip" role="tooltip"></div>
-
-<!-- TOAST STACK -->
-<div id="toast-stack" aria-live="polite" aria-label="Notifications"></div>
-
-<!-- CONTEXT MENU -->
-<div id="ctx-menu" style="display:none"></div>
-
-<script src="blockwatch.js"></script>
-</body>
+    <!-- load order matters: shared → network → charts → ui → panels → boot -->
+    <script src="client/shared.js"></script>
+    <script src="client/network.js"></script>
+    <script src="client/charts.js"></script>
+    <script src="client/ui.js"></script>
+    <script src="client/panels/node.js"></script>
+    <script src="client/panels/fees.js"></script>
+    <script src="client/panels/peers.js"></script>
+    <script src="client/panels/mining.js"></script>
+    <script src="client/panels/mempool.js"></script>
+    <script src="client/boot.js"></script>
+  </body>
 </html>
