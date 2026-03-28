@@ -59,7 +59,6 @@ const peersPanel = {
 
     const maxSent = peers.reduce((m, p) => Math.max(m, p.bytessent || 0), 1);
     const maxRecv = peers.reduce((m, p) => Math.max(m, p.bytesrecv || 0), 1);
-    const maxBW = Math.max(maxSent, maxRecv);
 
     tbody.innerHTML = peers
       .map((p) => {
@@ -84,8 +83,8 @@ const peersPanel = {
           (p.addr || "").replace(/:\d+$/, "").replace(/^\[(.+)\]$/, "$1"),
         );
         const ver = esc((p.subver || "").replace(/^\/|\/$/g, ""));
-        const sentPct = (((p.bytessent || 0) / maxBW) * 100).toFixed(1);
-        const recvPct = (((p.bytesrecv || 0) / maxBW) * 100).toFixed(1);
+        const sentPct = (((p.bytessent || 0) / maxSent) * 100).toFixed(1);
+        const recvPct = (((p.bytesrecv || 0) / maxRecv) * 100).toFixed(1);
 
         // Ping
         const pc =
@@ -113,13 +112,11 @@ const peersPanel = {
           <span class="peer-ver-text">${ver}</span>
           <div class="peer-bars-group">
             <div class="peer-bar-row">
-              <span class="peer-bar-lbl">sent</span>
-              <div class="peer-bar-track"><div class="peer-bar-fill" style="width:${sentPct}%;background:var(--pos)"></div></div>
+              <div class="peer-bar-track"><div class="peer-bar-fill bar-sent" style="width:${sentPct}%"></div></div>
               <span class="peer-bar-val sent">↑ ${utils.fmtBytes(p.bytessent || 0)}</span>
             </div>
             <div class="peer-bar-row">
-              <span class="peer-bar-lbl">recv</span>
-              <div class="peer-bar-track"><div class="peer-bar-fill" style="width:${recvPct}%;background:var(--orange)"></div></div>
+              <div class="peer-bar-track"><div class="peer-bar-fill bar-recv" style="width:${recvPct}%"></div></div>
               <span class="peer-bar-val recv">↓ ${utils.fmtBytes(p.bytesrecv || 0)}</span>
             </div>
           </div>
@@ -316,10 +313,6 @@ const peersPanel = {
         <div class="pd-stat-cell">
           <span class="pd-stat-val recv" data-pd="bw-recv">↓ ${utils.fmtBytes(p.bytesrecv || 0)}</span>
           <span class="pd-stat-lbl">recv</span>
-        </div>
-        <div class="pd-stat-cell">
-          <span class="pd-stat-val dim" data-pd="last-block-grid">${p.last_block > 0 ? utils.fmtAgeAgo(now - p.last_block) : "—"}</span>
-          <span class="pd-stat-lbl">last block</span>
         </div>
       </div>`;
 

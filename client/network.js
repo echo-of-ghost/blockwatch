@@ -19,7 +19,7 @@ const network = {
   _lastW: 0,
   _lastH: 0,
 
-  PAD_L: 52,
+  PAD_L: 10,
   PAD_R: 10,
   PAD_T: 18,
   PAD_B: 20,
@@ -97,7 +97,7 @@ const network = {
     // ── Y-axis grid + labels ──────────────────────────────────────────────
     const yTicks = this._niceYTicks(mx);
     ctx.font = "10px Geist Mono, monospace";
-    ctx.textAlign = "right";
+    ctx.textAlign = "left";
 
     yTicks.forEach((tick) => {
       const y = PAD_T + plotH - (tick / mx) * plotH;
@@ -110,7 +110,7 @@ const network = {
       ctx.stroke();
       ctx.setLineDash([]);
       ctx.fillStyle = "rgba(104,104,104,0.9)";
-      ctx.fillText(utils.fmtRate(tick), PAD_L - 4, y + 3);
+      ctx.fillText(utils.fmtRate(tick), PAD_L + 3, y - 3);
     });
 
     // ── X-axis tick marks (every 10 samples = ~50s with 5s intervals) ─────
