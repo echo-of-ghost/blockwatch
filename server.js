@@ -794,6 +794,7 @@ function startFastRefresh() {
         safe("getnettotals"),
         safe("getmempoolinfo"),
       ]);
+      if (!netTotals && !mempoolInfo) return;
       if (netTotals) _state.netTotals = netTotals;
       if (mempoolInfo) _state.mempoolInfo = mempoolInfo;
       _state.ts = Date.now();
