@@ -4,7 +4,7 @@ A real-time Bitcoin node dashboard. Connects directly to your local Bitcoin Core
 
 Uses Bitcoin Core's native ZMQ for real-time block notifications (14x fewer RPC calls) and falls back to polling if unavailable. No external APIs. Your node, your data.
 
-![blockwatch](screenshot-mainnet.png)
+![blockwatch](assets/screenshot-mainnet.png)
 
 ---
 
@@ -34,7 +34,7 @@ Uses Bitcoin Core's native ZMQ for real-time block notifications (14x fewer RPC 
 
 | Mainnet | Testnet4 | Signet | Regtest |
 |---|---|---|---|
-| ![mainnet](screenshot-mainnet.png) | ![testnet4](screenshot-testnet4.png) | ![signet](screenshot-signet.png) | ![regtest](screenshot-regtest.png) |
+| ![mainnet](assets/screenshot-mainnet.png) | ![testnet4](assets/screenshot-testnet4.png) | ![signet](assets/screenshot-signet.png) | ![regtest](assets/screenshot-regtest.png) |
 
 
 ---
