@@ -93,6 +93,17 @@ new MutationObserver(() => a11yCopyIcons()).observe(document.body, { childList: 
 document.addEventListener('click', () => contextMenu.hide());
 document.addEventListener('keydown', e => { if (e.key === 'Escape') contextMenu.hide(); });
 
+// Terminal drawer — Electron only (body.electron set by preload)
+if (window.terminal) {
+  terminalDrawer.init();
+  // Primary: globalShortcut in main relays via IPC → preload → document CustomEvent
+  document.addEventListener('terminal:toggle', () => terminalDrawer.toggle());
+  // Fallback: direct keydown
+  document.addEventListener('keydown', e => {
+    if (e.ctrlKey && e.key === '`') { e.preventDefault(); terminalDrawer.toggle(); }
+  });
+}
+
 // Peer table click delegation
 $('peer-table-body')?.addEventListener('click', e => {
   const row = e.target.closest('tr');

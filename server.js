@@ -8,6 +8,10 @@ const RPC_HOST = process.env.BITCOIN_RPC_HOST || "127.0.0.1";
 let RPC_PORT = parseInt(process.env.BITCOIN_RPC_PORT || "0");
 const SERVER_PORT = parseInt(process.env.PORT || "3000");
 const SERVER_HOST = process.env.HOST || "127.0.0.1";
+
+// HTTP server is enabled when running inside Electron (always) or when the
+// BLOCKWATCH_HTTP=1 env var is explicitly set (browser/self-hosted mode).
+const HTTP_ENABLED = !!process.versions.electron || process.env.BLOCKWATCH_HTTP === "1";
 const ZMQ_HOST = process.env.ZMQ_HOST || "127.0.0.1";
 const ZMQ_PORT = parseInt(process.env.ZMQ_PORT || "28332");
 
@@ -351,6 +355,7 @@ function loadStaticFiles() {
     "panels/peers.js",
     "panels/mining.js",
     "panels/mempool.js",
+    "terminal.js",
     "boot.js",
   ];
   const files = [
@@ -1117,7 +1122,7 @@ const server = http.createServer(async (req, res) => {
 // STARTUP
 // ═══════════════════════════════════════════════════════════════════════════════
 
-(async () => {
+async function start() {
   printBanner();
   await loadAuth();
 
@@ -1139,26 +1144,37 @@ const server = http.createServer(async (req, res) => {
   startDeploymentRefresh();
   startChainWatcher();
 
-  server.listen(SERVER_PORT, SERVER_HOST, () => {
-    if (SERVER_HOST !== "127.0.0.1" && SERVER_HOST !== "localhost") {
+  return new Promise((resolve) => {
+    server.listen(SERVER_PORT, SERVER_HOST, () => {
+      if (SERVER_HOST !== "127.0.0.1" && SERVER_HOST !== "localhost") {
+        row(
+          "warning",
+          "dashboard exposed on " + SERVER_HOST + " — ensure firewall is set",
+          A.neg,
+        );
+      }
+      row("node", RPC_HOST + ":" + RPC_PORT);
+      const bar = c(A.t4, "-".repeat(Math.min(W - 4, 38)));
+      process.stdout.write("  " + bar + "\n");
+      row("dashboard", "http://" + SERVER_HOST + ":" + SERVER_PORT, A.pos);
       row(
-        "warning",
-        "dashboard exposed on " + SERVER_HOST + " — ensure firewall is set",
-        A.neg,
+        "health",
+        "http://" + SERVER_HOST + ":" + SERVER_PORT + "/api/health",
+        A.t3,
       );
-    }
-    row("node", RPC_HOST + ":" + RPC_PORT);
-    const bar = c(A.t4, "-".repeat(Math.min(W - 4, 38)));
-    process.stdout.write("  " + bar + "\n");
-    row("dashboard", "http://" + SERVER_HOST + ":" + SERVER_PORT, A.pos);
-    row(
-      "health",
-      "http://" + SERVER_HOST + ":" + SERVER_PORT + "/api/health",
-      A.t3,
-    );
-    process.stdout.write("\n");
+      process.stdout.write("\n");
+      resolve(SERVER_PORT);
+    });
   });
-})();
+}
+
+if (require.main === module) {
+  if (!HTTP_ENABLED) {
+    console.log("blockwatch: use the Electron app, or set BLOCKWATCH_HTTP=1 to enable browser mode.");
+    process.exit(0);
+  }
+  start().catch((e) => { console.error(e); process.exit(1); });
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SHUTDOWN
@@ -1195,3 +1211,20 @@ process.on("uncaughtException", (err) => {
   console.error("[uncaught exception]", err);
   shutdown();
 });
+
+// stop() — same as shutdown() but resolves a Promise instead of calling
+// process.exit(). Used by the Electron main process so it can call app.exit()
+// after cleanup rather than letting the server force-kill the process.
+function stop() {
+  if (_shuttingDown) return Promise.resolve();
+  _shuttingDown = true;
+  if (_zmqSocket) { try { _zmqSocket.close(); } catch (_) {} _zmqSocket = null; }
+  _sseClients.forEach((r) => { try { r.destroy(); } catch (_) {} });
+  _sseClients = [];
+  return new Promise((resolve) => {
+    const t = setTimeout(resolve, 5000);
+    server.close(() => { _rpcAgent.destroy(); clearTimeout(t); resolve(); });
+  });
+}
+
+module.exports = { start, stop, rpc };
