@@ -57,8 +57,7 @@ const peersPanel = {
       return;
     }
 
-    const maxSent = peers.reduce((m, p) => Math.max(m, p.bytessent || 0), 1);
-    const maxRecv = peers.reduce((m, p) => Math.max(m, p.bytesrecv || 0), 1);
+    const maxBw = peers.reduce((m, p) => Math.max(m, p.bytessent || 0, p.bytesrecv || 0), 1);
 
     tbody.innerHTML = peers
       .map((p) => {
@@ -83,8 +82,8 @@ const peersPanel = {
           (p.addr || "").replace(/:\d+$/, "").replace(/^\[(.+)\]$/, "$1"),
         );
         const ver = esc((p.subver || "").replace(/^\/|\/$/g, ""));
-        const sentPct = (((p.bytessent || 0) / maxSent) * 100).toFixed(1);
-        const recvPct = (((p.bytesrecv || 0) / maxRecv) * 100).toFixed(1);
+        const sentPct = (((p.bytessent || 0) / maxBw) * 100).toFixed(1);
+        const recvPct = (((p.bytesrecv || 0) / maxBw) * 100).toFixed(1);
 
         // Ping
         const pc =

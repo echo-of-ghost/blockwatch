@@ -14,6 +14,7 @@ function safeRender(name, fn) {
 }
 
 let _firstRender = true;
+let _staleToastFired = false;
 
 function renderAll(d) {
   poller.setSync(d.blockchain?.initialblockdownload || false);
@@ -207,15 +208,20 @@ setInterval(() => {
   if (age < 30) {
     stale.textContent = '';
     stale.className = 'sb-stale';
-    if (dot && !dot.classList.contains('err')) dot.className = 'dot ok';
+    if (dot) dot.className = 'dot ok';
+    _staleToastFired = false;
   } else if (age < 60) {
     stale.textContent = age + 's ago';
     stale.className = 'sb-stale';
-    if (dot && !dot.classList.contains('err')) dot.className = 'dot warn';
+    if (dot) dot.className = 'dot warn';
   } else {
     stale.textContent = Math.floor(age / 60) + 'm ago';
     stale.className = 'sb-stale warn';
     if (dot) dot.className = 'dot err';
+    if (!_staleToastFired) {
+      _staleToastFired = true;
+      toastStack.add('bitcoind unreachable', 'warn');
+    }
   }
 
   mobileBar.updateStale(age);

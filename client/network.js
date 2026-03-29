@@ -343,6 +343,7 @@ const poller = {
   _lastSync: false,
   _lastFetchAt: null,
   _lastData: null,
+  _lastChain: null,
   _es: null,
 
   start() {
@@ -398,6 +399,23 @@ const poller = {
 
     this._prevTotals = { sent: totalSent, recv: totalRecv };
     this._prevFetchAt = nowT;
+
+    // Flush history buffers and reset panel state on chain switch
+    const incomingChain = raw.blockchain?.chain || null;
+    if (this._lastChain && incomingChain && incomingChain !== this._lastChain) {
+      network._histSent.fill(0);
+      network._histRecv.fill(0);
+      network._mempoolHistory.fill({ size: 0, txCount: 0 });
+      this._prevTotals = null;
+      this._prevFetchAt = null;
+      sentRate = 0;
+      recvRate = 0;
+      blocksPanel._initialised = false;
+      blocksPanel._selectedHeight = null;
+      blocksPanel._seenHeights = new Set();
+      peersPanel._selectedId = null;
+    }
+    this._lastChain = incomingChain;
 
     // Push to rolling chart history only if enough time has passed (3s guard
     // prevents rapid-fire pushes from block events and scheduled events close together)

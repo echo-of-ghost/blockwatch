@@ -678,6 +678,12 @@ async function onNewBlock() {
     const bc = await safe("getblockchaininfo");
     if (!bc) return;
 
+    if (_state.blockchain?.chain && bc.chain !== _state.blockchain.chain) {
+      await initState();
+      if (_state && !_state.error) broadcast();
+      return;
+    }
+
     // Dedup: skip if we've already processed this height
     if (bc.blocks <= (_state.blocks[0]?.height ?? -1)) return;
 
@@ -742,6 +748,21 @@ async function initZmq() {
   }
 }
 
+// ── Chain watcher — detects node switches regardless of ZMQ state ─────────────
+// Runs always alongside ZMQ. One cheap getblockchaininfo every 10s is enough
+// to catch a chain change within 10s, matching the pre-ZMQ behaviour.
+function startChainWatcher() {
+  setInterval(async () => {
+    if (!_state || _state.error) return;
+    const bc = await safe("getblockchaininfo");
+    if (!bc || !_state.blockchain?.chain) return;
+    if (bc.chain !== _state.blockchain.chain) {
+      await initState();
+      if (_state && !_state.error) broadcast();
+    }
+  }, 10000);
+}
+
 // ── Poll fallback — used when ZMQ is unavailable ──────────────────────────────
 // Checks for new blocks every 10s. If the node is mid-IBD this also provides
 // the regular blockchain-state updates that ZMQ alone doesn't cover.
@@ -754,6 +775,12 @@ function startPollFallback() {
     if (!_state) return;
     const bc = await safe("getblockchaininfo");
     if (!bc) return;
+    if (_state.blockchain?.chain && bc.chain !== _state.blockchain.chain) {
+      // Chain switched — full re-init so blocks, peers, fees all reset cleanly.
+      await initState();
+      if (_state && !_state.error) broadcast();
+      return;
+    }
     if (bc.blocks > (_state.blocks[0]?.height ?? -1)) {
       // New block found — do the full per-block refresh.
       await onNewBlock();
@@ -847,6 +874,7 @@ function startSparseRefresh() {
       if (uptime != null) _state.uptime = uptime;
       if (!ibd && feeResults.length === 4)
         _state.fees = normalizeFees(...feeResults);
+      if (!peers && !ni && !tips && uptime == null) return;
       _state.ts = Date.now();
       broadcast();
     } finally {
@@ -1102,6 +1130,7 @@ const server = http.createServer(async (req, res) => {
   startFastRefresh();
   startSparseRefresh();
   startDeploymentRefresh();
+  startChainWatcher();
 
   server.listen(SERVER_PORT, SERVER_HOST, () => {
     if (SERVER_HOST !== "127.0.0.1" && SERVER_HOST !== "localhost") {
