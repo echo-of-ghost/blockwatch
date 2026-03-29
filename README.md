@@ -63,6 +63,29 @@ npm run app
 
 > **Note:** AppImage icons require system integration (e.g. [AppImageLauncher](https://github.com/TheAssassin/AppImageLauncher)) to show in the GNOME/KDE taskbar on Wayland.
 
+### Verifying the signature
+
+Each release includes a detached GPG signature (`.asc`). To verify:
+
+**1. Import the signing key** (first time only):
+```bash
+gpg --keyserver keys.openpgp.org --recv-keys <KEY_ID>
+```
+
+Or fetch it directly from the releases page if provided there.
+
+**2. Verify:**
+```bash
+gpg --verify Blockwatch-2.0.0.AppImage.asc Blockwatch-2.0.0.AppImage
+```
+
+A good signature looks like:
+```
+gpg: Good signature from "Your Name <you@example.com>"
+```
+
+Any `BAD signature` result means the file has been tampered with — do not run it.
+
 ---
 
 ## Requirements
