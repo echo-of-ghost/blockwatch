@@ -1532,3 +1532,194 @@ a.ext-link:hover { color: var(--orange); }
 .bd-section-tech .bd-kv .k { color: var(--t4); }
 .bd-section-tech .bd-kv .v { color: var(--t4); font-size: var(--fs-xs); }
 .bd-section-tech .bd-kv .v.dim { color: var(--t4); opacity: .7; }
+/* ══════════════════════════════════════════════════════════════════════════════
+   ELECTRON — frameless window, drag region, traffic light spacing
+   Applied via body.electron added by electron/preload.js
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+/* Make the titlebar the drag handle for the window */
+body.electron #titlebar {
+  -webkit-app-region: drag;
+}
+
+/* macOS only — leave room for native traffic light buttons */
+body.electron.platform-darwin #titlebar {
+  padding-left: 80px;
+}
+
+/* Interactive elements inside the titlebar must opt out of dragging */
+body.electron #titlebar button,
+body.electron #titlebar a,
+body.electron #titlebar .dot,
+body.electron #titlebar #restore-bar,
+body.electron #titlebar [role="button"] {
+  -webkit-app-region: no-drag;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   TERMINAL DRAWER
+   Slides up from the bottom on Ctrl+` (Electron only).
+   Matches the panel design language — no borders, shadow for depth.
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+#terminal-drawer {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: 36vh;
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  background: rgba(10, 10, 10, 0.88);
+  backdrop-filter: blur(24px) saturate(130%);
+  -webkit-backdrop-filter: blur(24px) saturate(130%);
+  box-shadow:
+    0 -16px 60px rgba(0,0,0,.75),
+    0 -4px 20px rgba(0,0,0,.5);
+  z-index: 990;
+  transform: translateY(100%);
+  opacity: 0;
+  transition: transform var(--t-slow) ease, opacity var(--t-slow) ease;
+  font-family: var(--mono);
+  font-size: var(--fs-sm);
+}
+
+#terminal-drawer.term-visible {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+/* ── Header ── */
+.term-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  height: 28px;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.term-title {
+  display: flex;
+  align-items: center;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--t3);
+  font-family: var(--mono);
+}
+
+
+.term-hint {
+  color: var(--t4);
+  font-size: var(--fs-xs);
+  font-family: var(--sans);
+}
+
+.term-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.term-close-btn {
+  margin-left: 0;
+  background: none;
+  border: none;
+  color: var(--t4);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+  font-family: var(--sans);
+  transition: color var(--t-fast);
+}
+.term-close-btn:hover { color: var(--t2); }
+
+/* ── Output area — scroll-fade masks content under top edge ── */
+.term-output {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  /* Content fades under the top edge as it scrolls, matching .pb */
+  background:
+    linear-gradient(rgba(10,10,10,.88) 20%, transparent) top / 100% 24px no-repeat local,
+    radial-gradient(farthest-side at 50% 0%, rgba(0,0,0,.4), transparent) top / 100% 10px no-repeat scroll;
+  background-color: transparent;
+}
+
+.term-output::-webkit-scrollbar { width: 3px; }
+.term-output::-webkit-scrollbar-track { background: transparent; }
+.term-output::-webkit-scrollbar-thumb { background: var(--muted); border-radius: 2px; }
+
+.term-entry { display: flex; flex-direction: column; gap: 3px; }
+
+.term-echo {
+  color: var(--t4);
+  font-size: var(--fs-xs);
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.term-result {
+  color: var(--t2);
+  white-space: pre;
+  line-height: 1.65;
+  font-size: var(--fs-xs);
+  padding-left: 14px;
+}
+
+.term-result-err { color: var(--neg); }
+
+/* ── JSON syntax colors ── */
+.tj-key  { color: var(--t2); }
+.tj-str  { color: var(--grn); }
+.tj-num  { color: var(--orange); }
+.tj-bool { color: var(--pos); }
+.tj-null { color: var(--t4); }
+
+/* ── Input row ── */
+.term-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  height: 34px;
+  flex-shrink: 0;
+}
+
+.term-prompt-char {
+  color: var(--orange);
+  font-size: var(--fs-md);
+  line-height: 1;
+  flex-shrink: 0;
+  user-select: none;
+  opacity: .7;
+}
+
+.term-input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--t1);
+  font-family: var(--mono);
+  font-size: var(--fs-sm);
+  caret-color: var(--orange);
+}
+
+.term-input::placeholder { color: var(--t4); }
+.term-input:disabled { opacity: 0.4; }
+
+/* ── Terminal fullscreen toggle ── */
+#terminal-drawer.term-fullscreen {
+  height: 100vh !important;
+  top: 0;
+}

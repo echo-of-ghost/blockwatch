@@ -362,6 +362,8 @@ const charts = {
     },
   },
 
+  _resizeObservers: [],
+
   // Wire ResizeObservers — rAF-debounced
   init() {
     if (typeof ResizeObserver === "undefined") return;
@@ -369,7 +371,7 @@ const charts = {
     const observe = (panel, chart, hasData) => {
       if (!panel) return;
       let raf = null;
-      new ResizeObserver(() => {
+      const ro = new ResizeObserver(() => {
         if (!hasData()) return;
         if (panel.style.display === "none") return;
         if (raf) cancelAnimationFrame(raf);
@@ -377,7 +379,9 @@ const charts = {
           raf = null;
           chart._measure();
         });
-      }).observe(panel);
+      });
+      ro.observe(panel);
+      this._resizeObservers.push(ro);
     };
 
     observe($("p-col2-subsidy"), this.mempoolViz,
@@ -388,13 +392,15 @@ const charts = {
     const sparkPanel = $("p-col2-top");
     if (sparkPanel) {
       let raf = null;
-      new ResizeObserver(() => {
+      const ro = new ResizeObserver(() => {
         if (raf) cancelAnimationFrame(raf);
         raf = requestAnimationFrame(() => {
           raf = null;
           network._drawSpark();
         });
-      }).observe(sparkPanel);
+      });
+      ro.observe(sparkPanel);
+      this._resizeObservers.push(ro);
     }
   },
 };

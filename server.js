@@ -8,6 +8,10 @@ const RPC_HOST = process.env.BITCOIN_RPC_HOST || "127.0.0.1";
 let RPC_PORT = parseInt(process.env.BITCOIN_RPC_PORT || "0");
 const SERVER_PORT = parseInt(process.env.PORT || "3000");
 const SERVER_HOST = process.env.HOST || "127.0.0.1";
+
+// HTTP server is enabled when running inside Electron (always) or when the
+// BLOCKWATCH_HTTP=1 env var is explicitly set (browser/self-hosted mode).
+const HTTP_ENABLED = !!process.versions.electron || process.env.BLOCKWATCH_HTTP === "1";
 const ZMQ_HOST = process.env.ZMQ_HOST || "127.0.0.1";
 const ZMQ_PORT = parseInt(process.env.ZMQ_PORT || "28332");
 
@@ -164,6 +168,7 @@ function tryCookie() {
       try {
         const r = fs.readFileSync(cookie, "utf8").trim(),
           i = r.indexOf(":");
+        if (i < 1) continue;
         return {
           user: r.slice(0, i),
           pass: r.slice(i + 1),
@@ -181,6 +186,7 @@ function tryCookie() {
       const mtimeMs = fs.statSync(cookie).mtimeMs;
       const r = fs.readFileSync(cookie, "utf8").trim(),
         i = r.indexOf(":");
+      if (i < 1) continue;
       if (!best || mtimeMs > best.mtimeMs)
         best = {
           user: r.slice(0, i),
@@ -351,6 +357,7 @@ function loadStaticFiles() {
     "panels/peers.js",
     "panels/mining.js",
     "panels/mempool.js",
+    "terminal.js",
     "boot.js",
   ];
   const files = [
@@ -419,7 +426,23 @@ function loadStaticFiles() {
 }
 loadStaticFiles();
 
-function rpc(method, params = []) {
+// Commands that can legitimately take minutes to hours
+const SLOW_RPC_METHODS = new Set([
+  "gettxoutsetinfo",   // full UTXO set scan
+  "scantxoutset",      // UTXO scan for descriptors
+  "dumptxoutset",      // write UTXO snapshot to disk
+  "rescanblockchain",  // replay blocks for wallet
+  "importwallet",      // import + rescan
+  "importprivkey",     // triggers rescan
+  "importaddress",     // triggers rescan
+  "importpubkey",      // triggers rescan
+  "importmulti",       // triggers rescan
+  "importdescriptors", // triggers rescan
+  "verifychain",       // verifies all block files
+]);
+
+function rpc(method, params = [], timeoutMs) {
+  const ms = timeoutMs ?? (SLOW_RPC_METHODS.has(method) ? 660000 : 12000);
   return new Promise((resolve, reject) => {
     const { user, pass } = getAuth();
     const body = JSON.stringify({ jsonrpc: "1.0", id: method, method, params });
@@ -429,7 +452,7 @@ function rpc(method, params = []) {
         port: RPC_PORT,
         path: "/",
         method: "POST",
-        timeout: 12000,
+        timeout: ms,
         agent: _rpcAgent,
         headers: {
           Authorization:
@@ -700,6 +723,18 @@ async function onNewBlock() {
       safe("getchaintxstats", [Math.min(2016, bc.blocks || 1)]),
     ]);
 
+    // If the block header failed, skip the block update rather than pushing
+    // a broken entry into state. blockchain + mempool still update below.
+    if (!hdr) {
+      _state.blockchain = bc;
+      if (mi) _state.mempoolInfo = mi;
+      if (cts) _state.chainTxStats = cts;
+      delete _state.error;
+      _state.ts = Date.now();
+      broadcast();
+      return;
+    }
+
     const newBlock = normalizeBlock(blockHash, hdr, st);
     const maxBlocks = ibd ? 8 : 12;
 
@@ -721,6 +756,7 @@ async function onNewBlock() {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 let _pollFallbackActive = false;
+let _zmqSocket = null;
 
 async function initZmq() {
   let Subscriber;
@@ -734,15 +770,21 @@ async function initZmq() {
 
   try {
     const sock = new Subscriber();
+    _zmqSocket = sock;
     sock.connect(`tcp://${ZMQ_HOST}:${ZMQ_PORT}`);
     sock.subscribe("hashblock");
     row("zmq", `tcp://${ZMQ_HOST}:${ZMQ_PORT}`, A.grn);
 
     for await (const [topicBuf] of sock) {
       if (topicBuf.toString() !== "hashblock") continue;
-      await onNewBlock();
+      try {
+        await onNewBlock();
+      } catch (e) {
+        row("zmq", "onNewBlock error: " + e.message, A.neg);
+      }
     }
   } catch (e) {
+    _zmqSocket = null;
     row("zmq", "error: " + e.message + " — falling back to polling", A.pos);
     startPollFallback();
   }
@@ -958,6 +1000,7 @@ const server = http.createServer(async (req, res) => {
             ? +(bc.verificationprogress * 100).toFixed(3)
             : null,
         headers: bc.headers ?? null,
+        blockSource: _pollFallbackActive ? "poll" : "zmq",
         ts: Date.now(),
       };
     } catch (e) {
@@ -1110,7 +1153,7 @@ const server = http.createServer(async (req, res) => {
 // STARTUP
 // ═══════════════════════════════════════════════════════════════════════════════
 
-(async () => {
+async function start() {
   printBanner();
   await loadAuth();
 
@@ -1132,26 +1175,37 @@ const server = http.createServer(async (req, res) => {
   startDeploymentRefresh();
   startChainWatcher();
 
-  server.listen(SERVER_PORT, SERVER_HOST, () => {
-    if (SERVER_HOST !== "127.0.0.1" && SERVER_HOST !== "localhost") {
+  return new Promise((resolve) => {
+    server.listen(SERVER_PORT, SERVER_HOST, () => {
+      if (SERVER_HOST !== "127.0.0.1" && SERVER_HOST !== "localhost") {
+        row(
+          "warning",
+          "dashboard exposed on " + SERVER_HOST + " — ensure firewall is set",
+          A.neg,
+        );
+      }
+      row("node", RPC_HOST + ":" + RPC_PORT);
+      const bar = c(A.t4, "-".repeat(Math.min(W - 4, 38)));
+      process.stdout.write("  " + bar + "\n");
+      row("dashboard", "http://" + SERVER_HOST + ":" + SERVER_PORT, A.pos);
       row(
-        "warning",
-        "dashboard exposed on " + SERVER_HOST + " — ensure firewall is set",
-        A.neg,
+        "health",
+        "http://" + SERVER_HOST + ":" + SERVER_PORT + "/api/health",
+        A.t3,
       );
-    }
-    row("node", RPC_HOST + ":" + RPC_PORT);
-    const bar = c(A.t4, "-".repeat(Math.min(W - 4, 38)));
-    process.stdout.write("  " + bar + "\n");
-    row("dashboard", "http://" + SERVER_HOST + ":" + SERVER_PORT, A.pos);
-    row(
-      "health",
-      "http://" + SERVER_HOST + ":" + SERVER_PORT + "/api/health",
-      A.t3,
-    );
-    process.stdout.write("\n");
+      process.stdout.write("\n");
+      resolve(SERVER_PORT);
+    });
   });
-})();
+}
+
+if (require.main === module) {
+  if (!HTTP_ENABLED) {
+    console.log("blockwatch: use the Electron app, or set BLOCKWATCH_HTTP=1 to enable browser mode.");
+    process.exit(0);
+  }
+  start().catch((e) => { console.error(e); process.exit(1); });
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SHUTDOWN
@@ -1168,7 +1222,9 @@ function shutdown() {
     console.error("[blockwatch] shutdown timeout — forcing exit");
     process.exit(1);
   }, 5000);
-  force.unref();
+  if (_zmqSocket) { try { _zmqSocket.close(); } catch (_) {} _zmqSocket = null; }
+  _sseClients.forEach((r) => { try { r.destroy(); } catch (_) {} });
+  _sseClients = [];
   server.close(() => {
     _rpcAgent.destroy();
     clearTimeout(force);
@@ -1185,3 +1241,20 @@ process.on("uncaughtException", (err) => {
   console.error("[uncaught exception]", err);
   shutdown();
 });
+
+// stop() — same as shutdown() but resolves a Promise instead of calling
+// process.exit(). Used by the Electron main process so it can call app.exit()
+// after cleanup rather than letting the server force-kill the process.
+function stop() {
+  if (_shuttingDown) return Promise.resolve();
+  _shuttingDown = true;
+  if (_zmqSocket) { try { _zmqSocket.close(); } catch (_) {} _zmqSocket = null; }
+  _sseClients.forEach((r) => { try { r.destroy(); } catch (_) {} });
+  _sseClients = [];
+  return new Promise((resolve) => {
+    const t = setTimeout(resolve, 5000);
+    server.close(() => { _rpcAgent.destroy(); clearTimeout(t); resolve(); });
+  });
+}
+
+module.exports = { start, stop, rpc };

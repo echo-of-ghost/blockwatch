@@ -624,9 +624,12 @@ const banList = {
       )
       .join("");
 
-    rowsEl.querySelectorAll(".pa-btn[data-unban]").forEach((btn) => {
-      btn.addEventListener("click", async (e) => {
+    if (!banList._unbanDelegated) {
+      banList._unbanDelegated = true;
+      rowsEl.addEventListener("click", async (e) => {
         e.stopPropagation();
+        const btn = e.target.closest(".pa-btn[data-unban]");
+        if (!btn) return;
         btn.classList.add("pa-working");
         try {
           await peersPanel.rpc("setban", [btn.dataset.unban, "remove"]);
@@ -636,6 +639,6 @@ const banList = {
           btn.classList.remove("pa-working");
         }
       });
-    });
+    }
   },
 };

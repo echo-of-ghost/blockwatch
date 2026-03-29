@@ -492,16 +492,18 @@ const tooltipEngine = (() => {
 
     // MutationObserver picks up .k elements injected by dynamic renders
     // (peer detail tabs, softfork rows, block detail panel, etc.)
-    const obs = new MutationObserver((muts) => {
-      for (const m of muts) {
-        for (const node of m.addedNodes) {
-          if (node.nodeType !== 1) continue;
-          if (node.classList && node.classList.contains("k")) _wire(node);
-          node.querySelectorAll && node.querySelectorAll(".k").forEach(_wire);
+    if (!init._obs) {
+      init._obs = new MutationObserver((muts) => {
+        for (const m of muts) {
+          for (const node of m.addedNodes) {
+            if (node.nodeType !== 1) continue;
+            if (node.classList && node.classList.contains("k")) _wire(node);
+            node.querySelectorAll && node.querySelectorAll(".k").forEach(_wire);
+          }
         }
-      }
-    });
-    obs.observe(document.body, { childList: true, subtree: true });
+      });
+      init._obs.observe(document.body, { childList: true, subtree: true });
+    }
   }
 
   return { init };
