@@ -368,10 +368,10 @@ const poller = {
     };
 
     es.onerror = () => {
-      if (handled) return;
+      if (handled || this._es !== es) return;
       handled = true;
       es.close();
-      if (this._es === es) this._es = null;
+      this._es = null;
       this._onError(new Error("Server unreachable"));
     };
   },

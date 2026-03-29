@@ -707,6 +707,18 @@ async function onNewBlock() {
       safe("getchaintxstats", [Math.min(2016, bc.blocks || 1)]),
     ]);
 
+    // If the block header failed, skip the block update rather than pushing
+    // a broken entry into state. blockchain + mempool still update below.
+    if (!hdr) {
+      _state.blockchain = bc;
+      if (mi) _state.mempoolInfo = mi;
+      if (cts) _state.chainTxStats = cts;
+      delete _state.error;
+      _state.ts = Date.now();
+      broadcast();
+      return;
+    }
+
     const newBlock = normalizeBlock(blockHash, hdr, st);
     const maxBlocks = ibd ? 8 : 12;
 

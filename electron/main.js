@@ -20,7 +20,7 @@ async function createWindow(port) {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      sandbox: true,
     },
   });
 
@@ -41,7 +41,11 @@ app.whenReady().then(async () => {
 
   // Terminal IPC — renderer sends a bitcoin-cli style command, we call RPC
   // directly in the main process where credentials live.
+  let _lastExec = 0;
   ipcMain.handle("terminal:exec", async (_, method, params) => {
+    const now = Date.now();
+    if (now - _lastExec < 200) return { ok: false, error: "rate limited" };
+    _lastExec = now;
     try {
       const result = await rpc(method, params || []);
       return { ok: true, result };
