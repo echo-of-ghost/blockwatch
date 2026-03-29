@@ -1555,7 +1555,8 @@ body.electron #titlebar [role="button"] {
 
 /* ══════════════════════════════════════════════════════════════════════════════
    TERMINAL DRAWER
-   Slides up from the bottom on Ctrl+T (Electron only).
+   Slides up from the bottom on Ctrl+` (Electron only).
+   Matches the panel design language — no borders, shadow for depth.
    ══════════════════════════════════════════════════════════════════════════════ */
 
 #terminal-drawer {
@@ -1565,11 +1566,12 @@ body.electron #titlebar [role="button"] {
   min-height: 220px;
   display: flex;
   flex-direction: column;
-  background: rgba(8, 8, 8, 0.9);
-  backdrop-filter: blur(20px) saturate(140%);
-  -webkit-backdrop-filter: blur(20px) saturate(140%);
-  border-top: 1px solid var(--border);
-  box-shadow: 0 -12px 48px rgba(0,0,0,.7), 0 -1px 0 rgba(var(--orange-rgb),.12);
+  background: rgba(10, 10, 10, 0.88);
+  backdrop-filter: blur(24px) saturate(130%);
+  -webkit-backdrop-filter: blur(24px) saturate(130%);
+  box-shadow:
+    0 -16px 60px rgba(0,0,0,.75),
+    0 -4px 20px rgba(0,0,0,.5);
   z-index: 990;
   transform: translateY(100%);
   opacity: 0;
@@ -1587,35 +1589,29 @@ body.electron #titlebar [role="button"] {
 .term-header {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   padding: 0 12px;
-  height: 32px;
+  height: 28px;
   flex-shrink: 0;
-  border-bottom: 1px solid var(--border);
   user-select: none;
 }
 
 .term-title {
   display: flex;
   align-items: center;
-  gap: 6px;
-  color: var(--t2);
   font-size: var(--fs-xs);
   font-weight: 600;
-  letter-spacing: .1em;
+  letter-spacing: .12em;
   text-transform: uppercase;
+  color: var(--t3);
+  font-family: var(--mono);
 }
 
-.term-title-dot {
-  display: inline-block;
-  width: 6px; height: 6px;
-  background: var(--orange);
-  border-radius: 50%;
-}
 
 .term-hint {
   color: var(--t4);
   font-size: var(--fs-xs);
+  font-family: var(--sans);
 }
 
 .term-close-btn {
@@ -1623,32 +1619,39 @@ body.electron #titlebar [role="button"] {
   background: none;
   border: none;
   color: var(--t4);
-  font-size: 16px;
+  font-size: 15px;
   line-height: 1;
   cursor: pointer;
   padding: 0 2px;
+  font-family: var(--sans);
   transition: color var(--t-fast);
 }
 .term-close-btn:hover { color: var(--t2); }
 
-/* ── Output area ── */
+/* ── Output area — scroll-fade masks content under top edge ── */
 .term-output {
   flex: 1;
   overflow-y: auto;
-  padding: 8px 12px;
+  min-height: 0;
+  padding: 10px 14px;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  /* Content fades under the top edge as it scrolls, matching .pb */
+  background:
+    linear-gradient(rgba(10,10,10,.88) 20%, transparent) top / 100% 24px no-repeat local,
+    radial-gradient(farthest-side at 50% 0%, rgba(0,0,0,.4), transparent) top / 100% 10px no-repeat scroll;
+  background-color: transparent;
 }
 
-.term-output::-webkit-scrollbar { width: 4px; }
+.term-output::-webkit-scrollbar { width: 3px; }
 .term-output::-webkit-scrollbar-track { background: transparent; }
 .term-output::-webkit-scrollbar-thumb { background: var(--muted); border-radius: 2px; }
 
 .term-entry { display: flex; flex-direction: column; gap: 3px; }
 
 .term-echo {
-  color: var(--t3);
+  color: var(--t4);
   font-size: var(--fs-xs);
   display: flex;
   align-items: baseline;
@@ -1658,14 +1661,12 @@ body.electron #titlebar [role="button"] {
 .term-result {
   color: var(--t2);
   white-space: pre;
-  line-height: 1.6;
+  line-height: 1.65;
   font-size: var(--fs-xs);
   padding-left: 14px;
 }
 
-.term-result-err {
-  color: var(--neg);
-}
+.term-result-err { color: var(--neg); }
 
 /* ── JSON syntax colors ── */
 .tj-key  { color: var(--t2); }
@@ -1679,10 +1680,9 @@ body.electron #titlebar [role="button"] {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 12px;
-  height: 36px;
+  padding: 0 14px;
+  height: 34px;
   flex-shrink: 0;
-  border-top: 1px solid var(--border);
 }
 
 .term-prompt-char {
@@ -1691,6 +1691,7 @@ body.electron #titlebar [role="button"] {
   line-height: 1;
   flex-shrink: 0;
   user-select: none;
+  opacity: .7;
 }
 
 .term-input {
@@ -1705,4 +1706,4 @@ body.electron #titlebar [role="button"] {
 }
 
 .term-input::placeholder { color: var(--t4); }
-.term-input:disabled { opacity: 0.5; }
+.term-input:disabled { opacity: 0.4; }
