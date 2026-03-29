@@ -721,6 +721,7 @@ async function onNewBlock() {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 let _pollFallbackActive = false;
+let _zmqSocket = null;
 
 async function initZmq() {
   let Subscriber;
@@ -734,15 +735,21 @@ async function initZmq() {
 
   try {
     const sock = new Subscriber();
+    _zmqSocket = sock;
     sock.connect(`tcp://${ZMQ_HOST}:${ZMQ_PORT}`);
     sock.subscribe("hashblock");
     row("zmq", `tcp://${ZMQ_HOST}:${ZMQ_PORT}`, A.grn);
 
     for await (const [topicBuf] of sock) {
       if (topicBuf.toString() !== "hashblock") continue;
-      await onNewBlock();
+      try {
+        await onNewBlock();
+      } catch (e) {
+        row("zmq", "onNewBlock error: " + e.message, A.neg);
+      }
     }
   } catch (e) {
+    _zmqSocket = null;
     row("zmq", "error: " + e.message + " — falling back to polling", A.pos);
     startPollFallback();
   }
@@ -1169,6 +1176,9 @@ function shutdown() {
     process.exit(1);
   }, 5000);
   force.unref();
+  if (_zmqSocket) { try { _zmqSocket.close(); } catch (_) {} _zmqSocket = null; }
+  _sseClients.forEach((r) => { try { r.destroy(); } catch (_) {} });
+  _sseClients = [];
   server.close(() => {
     _rpcAgent.destroy();
     clearTimeout(force);

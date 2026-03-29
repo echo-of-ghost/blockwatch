@@ -231,7 +231,7 @@ setInterval(() => {
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) {
     safeRender('mempoolViz',  () => charts.mempoolViz.draw(network._mempoolHistory));
-    safeRender('blockTiming', () => charts.blockTiming.draw(network._lastData?.blocks || []));
+    safeRender('blockTiming', () => charts.blockTiming.draw(poller._lastData?.blocks || []));
     safeRender('bandwidth',   () => network._drawSpark());
   }
 });

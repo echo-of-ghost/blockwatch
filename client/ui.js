@@ -283,15 +283,18 @@ const layout = {
       }, 60);
     });
 
-    new MutationObserver(() => {
-      this._allPanels().forEach((p) => {
-        if (p._lv17 && p._dragInit && p._rr && p._cc) return;
-        this._addHandles(p);
-        this._initDrag(p);
-        this._initResize(p);
-        this._initClose(p);
+    if (!this._panelObs) {
+      this._panelObs = new MutationObserver(() => {
+        this._allPanels().forEach((p) => {
+          if (p._lv17 && p._dragInit && p._rr && p._cc) return;
+          this._addHandles(p);
+          this._initDrag(p);
+          this._initResize(p);
+          this._initClose(p);
+        });
       });
-    }).observe(this._main, { childList: true, subtree: true });
+      this._panelObs.observe(this._main, { childList: true, subtree: true });
+    }
   },
 
   _clearShellStyles() {
@@ -1096,9 +1099,25 @@ const toastStack = {
 // ═══════════════════════════════════════════════════════════════════════════════
 const contextMenu = {
   _el: null,
+  _panel: null,
 
   _getEl() {
-    if (!this._el) this._el = $("ctx-menu");
+    if (!this._el) {
+      this._el = $("ctx-menu");
+      if (this._el) {
+        this._el.addEventListener("click", (e) => {
+          const item = e.target.closest("[data-action]");
+          if (!item) return;
+          if (item.dataset.action === "toggle") {
+            const isMin = layout._minimized.has(this._panel);
+            isMin ? layout.restore(this._panel) : layout.minimize(this._panel);
+          } else if (item.dataset.action === "reset") {
+            layout._reset();
+          }
+          this.hide();
+        });
+      }
+    }
     return this._el;
   },
 
@@ -1106,21 +1125,12 @@ const contextMenu = {
     const el = this._getEl();
     if (!el) return;
 
+    this._panel = panel;
     const isMin = layout._minimized.has(panel);
     el.innerHTML = `
       <div class="ctx-item" data-action="toggle"><span class="ctx-icon">${isMin ? "&#9672;" : "&#9634;"}</span>${isMin ? "show panel" : "hide panel"}</div>
       <div class="ctx-sep"></div>
       <div class="ctx-item" data-action="reset"><span class="ctx-icon">&#8635;</span>reset layout</div>`;
-
-    el.querySelector('[data-action="toggle"]').addEventListener("click", () => {
-      isMin ? layout.restore(panel) : layout.minimize(panel);
-      this.hide();
-    });
-
-    el.querySelector('[data-action="reset"]').addEventListener("click", () => {
-      layout._reset();
-      this.hide();
-    });
 
     el.style.display = "block";
     const mw = el.offsetWidth,
