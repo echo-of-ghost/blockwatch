@@ -9,10 +9,12 @@
     "start:signet": "BITCOIN_RPC_PORT=38332 node server.js",
     "start:regtest": "BITCOIN_RPC_PORT=18443 node server.js",
     "app": "electron .",
-    "dist": "electron-builder --linux"
+    "dist": "electron-builder --linux",
+    "release": "npm run dist && gpg --detach-sign --armor dist/*.AppImage"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
   },
   "dependencies": {
     "zeromq": "^6.5.0"

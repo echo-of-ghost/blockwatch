@@ -201,6 +201,15 @@ const terminalDrawer = (() => {
 
     document.getElementById('term-close')
       ?.addEventListener('click', () => hide());
+
+    const maxBtn = document.getElementById('term-maximize');
+    maxBtn?.addEventListener('click', () => {
+      const el = _el();
+      if (!el) return;
+      const full = el.classList.toggle('term-fullscreen');
+      maxBtn.textContent = full ? '⤡' : '⤢';
+      maxBtn.setAttribute('aria-label', full ? 'Restore terminal' : 'Maximize terminal');
+    });
   }
 
   return { init, show, hide, toggle, isOpen };

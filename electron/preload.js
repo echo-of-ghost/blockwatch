@@ -6,6 +6,7 @@ const { contextBridge, ipcRenderer } = require("electron");
 // document is shared between the isolated preload context and the page.
 document.addEventListener("DOMContentLoaded", () => {
   document.body.classList.add("electron");
+  document.body.classList.add("platform-" + process.platform);
 });
 
 // Relay Ctrl+` from main process into the page via document.

@@ -984,6 +984,7 @@ const server = http.createServer(async (req, res) => {
             ? +(bc.verificationprogress * 100).toFixed(3)
             : null,
         headers: bc.headers ?? null,
+        blockSource: _pollFallbackActive ? "poll" : "zmq",
         ts: Date.now(),
       };
     } catch (e) {

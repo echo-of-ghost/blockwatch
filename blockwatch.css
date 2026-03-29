@@ -1540,7 +1540,10 @@ a.ext-link:hover { color: var(--orange); }
 /* Make the titlebar the drag handle for the window */
 body.electron #titlebar {
   -webkit-app-region: drag;
-  /* Leave room for macOS traffic lights (close/minimize/maximize) */
+}
+
+/* macOS only — leave room for native traffic light buttons */
+body.electron.platform-darwin #titlebar {
   padding-left: 80px;
 }
 
@@ -1614,8 +1617,15 @@ body.electron #titlebar [role="button"] {
   font-family: var(--sans);
 }
 
-.term-close-btn {
+.term-actions {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.term-close-btn {
+  margin-left: 0;
   background: none;
   border: none;
   color: var(--t4);
@@ -1707,3 +1717,9 @@ body.electron #titlebar [role="button"] {
 
 .term-input::placeholder { color: var(--t4); }
 .term-input:disabled { opacity: 0.4; }
+
+/* ── Terminal fullscreen toggle ── */
+#terminal-drawer.term-fullscreen {
+  height: 100vh !important;
+  top: 0;
+}
