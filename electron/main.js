@@ -9,8 +9,8 @@ let _serverPort = null;
 
 async function createWindow(port) {
   _win = new BrowserWindow({
-    width: 1440,
-    height: 900,
+    width: 1920,
+    height: 1200,
     minWidth: 900,
     minHeight: 600,
     frame: false,
