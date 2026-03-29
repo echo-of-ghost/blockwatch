@@ -426,7 +426,23 @@ function loadStaticFiles() {
 }
 loadStaticFiles();
 
-function rpc(method, params = []) {
+// Commands that can legitimately take minutes to hours
+const SLOW_RPC_METHODS = new Set([
+  "gettxoutsetinfo",   // full UTXO set scan
+  "scantxoutset",      // UTXO scan for descriptors
+  "dumptxoutset",      // write UTXO snapshot to disk
+  "rescanblockchain",  // replay blocks for wallet
+  "importwallet",      // import + rescan
+  "importprivkey",     // triggers rescan
+  "importaddress",     // triggers rescan
+  "importpubkey",      // triggers rescan
+  "importmulti",       // triggers rescan
+  "importdescriptors", // triggers rescan
+  "verifychain",       // verifies all block files
+]);
+
+function rpc(method, params = [], timeoutMs) {
+  const ms = timeoutMs ?? (SLOW_RPC_METHODS.has(method) ? 660000 : 12000);
   return new Promise((resolve, reject) => {
     const { user, pass } = getAuth();
     const body = JSON.stringify({ jsonrpc: "1.0", id: method, method, params });
@@ -436,7 +452,7 @@ function rpc(method, params = []) {
         port: RPC_PORT,
         path: "/",
         method: "POST",
-        timeout: 12000,
+        timeout: ms,
         agent: _rpcAgent,
         headers: {
           Authorization:
