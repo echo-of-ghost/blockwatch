@@ -98,6 +98,11 @@ const terminalDrawer = (() => {
       return;
     }
 
+    if (trimmed.length > 10000) {
+      _append(trimmed.slice(0, 40) + '…', 'input too long', true);
+      return;
+    }
+
     _history.unshift(trimmed);
     if (_history.length > 100) _history.pop();
     _histIdx = -1;

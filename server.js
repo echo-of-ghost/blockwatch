@@ -168,6 +168,7 @@ function tryCookie() {
       try {
         const r = fs.readFileSync(cookie, "utf8").trim(),
           i = r.indexOf(":");
+        if (i < 1) continue;
         return {
           user: r.slice(0, i),
           pass: r.slice(i + 1),
@@ -185,6 +186,7 @@ function tryCookie() {
       const mtimeMs = fs.statSync(cookie).mtimeMs;
       const r = fs.readFileSync(cookie, "utf8").trim(),
         i = r.indexOf(":");
+      if (i < 1) continue;
       if (!best || mtimeMs > best.mtimeMs)
         best = {
           user: r.slice(0, i),
@@ -1191,7 +1193,6 @@ function shutdown() {
     console.error("[blockwatch] shutdown timeout — forcing exit");
     process.exit(1);
   }, 5000);
-  force.unref();
   if (_zmqSocket) { try { _zmqSocket.close(); } catch (_) {} _zmqSocket = null; }
   _sseClients.forEach((r) => { try { r.destroy(); } catch (_) {} });
   _sseClients = [];
