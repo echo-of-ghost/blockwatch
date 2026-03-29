@@ -8,6 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 
+## [2.0.0] - 2026-03-29
+
+### Added
+- **Electron desktop app**: blockwatch now ships as a standalone desktop application distributable as an AppImage (Linux). Frameless window with native macOS traffic lights via `titleBarStyle: hiddenInset`. Build with `npm run dist`, run in dev with `npm run app`.
+- **In-app terminal**: A slide-up terminal drawer gives direct bitcoin-cli style access to any RPC method without leaving the app. Toggle with Ctrl+\` (or Cmd+\` on macOS). Full command history (↑/↓), JSON syntax highlighting, and quoted/JSON argument parsing.
+- **IPC security model**: Terminal RPC calls are routed through the Electron main process via `ipcMain`/`contextBridge`. RPC credentials never reach the renderer. Rate-limited to one call per 200ms. Only explicitly allowed via the `terminal:exec` IPC channel.
+- **Slow RPC timeout**: Methods that can run for minutes (`gettxoutsetinfo`, `scantxoutset`, `rescanblockchain`, `verifychain`, and related wallet import/rescan calls) use an 11-minute timeout instead of the default 12-second timeout, preventing premature failures during UTXO scans.
+- **Platform-aware layout**: `<body>` receives `platform-linux` / `platform-darwin` / `platform-win32` class via preload, allowing CSS to suppress the macOS traffic-light inset padding on Linux.
+
+### Changed
+- **Block timing chart**: Bars now render more accurately with corrected spacing and scale.
+- **Ban rows**: Ban list entries display more cleanly in the peers panel.
+- **`client/shared.js` formatting**: Minor cleanup to fee normalisation and shared utilities.
+
+
 ## [1.3.0] - 2026-03-29
 
 ### Added

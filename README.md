@@ -39,6 +39,32 @@ Uses Bitcoin Core's native ZMQ for real-time block notifications (14x fewer RPC 
 
 ---
 
+## Desktop App (AppImage)
+
+blockwatch ships as a self-contained Linux desktop application. Download the latest `.AppImage` from the [releases page](https://github.com/echo-of-ghost/blockwatch/releases), make it executable, and run it — no installation required.
+
+```bash
+chmod +x Blockwatch-2.0.0.AppImage
+./Blockwatch-2.0.0.AppImage
+```
+
+The app embeds a Node.js server and opens directly to the dashboard. All configuration (cookie auth, ZMQ, environment variables) works the same as the browser version.
+
+To build the AppImage yourself:
+```bash
+npm install
+npm run dist        # outputs to dist/
+```
+
+To run in dev mode without packaging:
+```bash
+npm run app
+```
+
+> **Note:** AppImage icons require system integration (e.g. [AppImageLauncher](https://github.com/TheAssassin/AppImageLauncher)) to show in the GNOME/KDE taskbar on Wayland.
+
+---
+
 ## Requirements
 
 - [Node.js](https://nodejs.org) v18 or later
@@ -331,6 +357,25 @@ All panels are resizable by dragging the handles between them. Panels can also b
 
 Panel order, column widths, and hidden state all persist automatically across page refreshes via localStorage.
 
+### Terminal
+
+Press **Ctrl+`** (or **Cmd+`** on macOS) to open the built-in terminal drawer. Available in the Electron app only.
+
+Type any bitcoin-cli RPC method and arguments directly:
+
+```
+getblockchaininfo
+getmempoolinfo
+gettxoutsetinfo
+getpeerinfo
+estimatesmartfee 1
+getblock <hash> 2
+```
+
+Arguments are parsed the same as bitcoin-cli — strings, numbers, and JSON all work. Use ↑/↓ to navigate history. Output is syntax-highlighted JSON.
+
+RPC calls are routed through the Electron main process. Credentials are never exposed to the renderer.
+
 ### Peer controls
 
 Click any row in the peers table to inspect that peer's full detail — protocol version, services, latency, sync height, bandwidth, and gossip stats. From the detail panel you can disconnect a peer or ban them for 1h / 24h / 7d / 30d / permanently. Ban list is shown in the bans panel and entries can be removed from there.
@@ -353,10 +398,16 @@ blockwatch/
   client/
     boot.js                      — Initialization, event wiring, polling start
     network.js                   — EventSource listener, bandwidth tracking, data export
+    terminal.js                  — In-app terminal drawer (Electron only)
     *.js                         — Panel rendering modules
+  electron/
+    main.js                      — Electron main process, window creation, terminal IPC
+    preload.js                   — Context bridge: terminal RPC, platform class, toggle relay
+  assets/
+    icon.png                     — App icon (1024×1024)
   index.html                     — Frontend markup
   blockwatch.css                 — Styles
-  package.json                   — zeromq dependency
+  package.json                   — Dependencies and electron-builder config
   blockwatch@.service            — systemd service file (Linux)
   com.blockwatch.dashboard.plist — launchd service file (macOS)
   CHANGELOG.md
