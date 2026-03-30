@@ -1042,6 +1042,31 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // ── /api/block/:height — fetch a single block by height ───────────────────
+  const blockMatch = url.pathname.match(/^\/api\/block\/(\d+)$/);
+  if (blockMatch && req.method === "GET") {
+    const height = parseInt(blockMatch[1], 10);
+    if (!Number.isInteger(height) || height < 0) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "invalid height" }));
+      return;
+    }
+    try {
+      const hash = await rpc("getblockhash", [height]);
+      const [hdr, st] = await Promise.all([
+        safe("getblockheader", [hash, true]),
+        safe("getblockstats", [hash, BLOCK_STATS_FIELDS]),
+      ]);
+      if (!hdr) throw new Error("block not found");
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(normalizeBlock(hash, hdr, st)));
+    } catch (e) {
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+
   // ── /api/rpc — privileged loopback-only proxy for peer management ──────────
   if (url.pathname === "/api/rpc" && req.method === "POST") {
     // SECURITY: proxies disconnect and ban calls. Only allow loopback connections.

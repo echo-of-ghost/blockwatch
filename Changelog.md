@@ -5,8 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.1.0] - 2026-03-30
 
+### Added
+- **Themed text selection**: `::selection` now uses the chain accent colour (orange on mainnet, with per-chain overrides for testnet4/signet/regtest) instead of the browser default blue.
+
+### Changed
+- **Peer detail panel redesigned**: ping and connected-time are now displayed as large `--fs-xl` hero metrics. A split bandwidth bar (sent/recv) replaces the plain text labels. Stat grid reduced to the four most useful fields. Address displayed in monospace at `--fs-xl` / `font-weight: 400` — readable across IPv4, IPv6, and 62-character onion v3 addresses without truncation.
+- **Titlebar decluttered**: removed the block height from the titlebar; the hero strip already shows it prominently at large size.
+- **Titlebar vertical alignment**: all titlebar elements (version, sync badge, clock, snapshot button) now align to centre. Previously the clock appeared slightly higher than adjacent elements due to `inline-flex` baseline calculation differences.
+- **Hover highlight rows**: `.kv`, `.bd-kv`, `.pd-kv` hover state now uses a `::before` pseudo-element (`inset: 0 -12px; z-index: -1`) instead of a negative margin, eliminating the layout reflow on hover.
+- **Color tokens**: `--pos` / `--pos-rgb` / `--pos-dim` renamed to `--amber` / `--amber-rgb` / `--amber-dim` throughout CSS and JS for clarity. `--bg-canvas` token added for the app background.
+- **Contrast improved**: `--t3` raised from `#686868` to `#808080` and `--t4` from `#585858` to `#686868` to meet WCAG AA contrast ratios on the dark background.
+- **Font weight declaration corrected**: `@font-face` declared `font-weight: 100 900` (variable range) but only a Regular `.woff2` is bundled. Changed to `font-weight: 400` to match what is actually loaded.
+- **`user-select: none` scope tightened**: removed from `.panel` (which blocked text copy in detail panes); the drag handle `.ph` already had it.
+- **Service badge contrast**: `.svc-cap` background raised from `--t4` to `--t2` so the badge text passes contrast requirements.
+
+### Fixed
+- **Block height search keyboard access**: the `#` height label in block detail now has `role="button"`, `tabindex="0"`, and an `aria-label`, and responds to Enter/Space — previously only clickable with a mouse.
+- **Dead CSS removed**: eliminated unused peer-table selectors (`.ping-cell`, `.ping-dot`, `.peer-bw-wrap`, `.td-dir`, `.td-net`, `.td-ver`, `.td-peer-addr`, `.td-inout`, `.td-bw`, and the `td:nth-child(8)` rule) left over from earlier peer table iterations.
 
 ## [2.0.0] - 2026-03-29
 

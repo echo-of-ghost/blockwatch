@@ -12,29 +12,12 @@
     <link rel="stylesheet" href="blockwatch.css" />
   </head>
   <body>
-    <noscript
-      ><style>
-        .ns {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          height: 100vh;
-          background: #080808;
-          color: #686868;
-          font-family: monospace;
-          font-size: 12px;
-          flex-direction: column;
-          gap: 8px;
-        }
-      </style>
+    <noscript>
       <div class="ns">
-        <span>blockwatch requires javascript</span
-        ><span style="color: #404040; font-size: 10px"
-          >real-time RPC polling needs JS — enable it in your browser and
-          reload</span
-        >
-      </div></noscript
-    >
+        <span>blockwatch requires javascript</span>
+        <span class="ns-sub">real-time RPC polling needs JS — enable it in your browser and reload</span>
+      </div>
+    </noscript>
 
     <!-- Single full-viewport container. #main fills it. All panels are position:absolute inside. -->
     <div id="app">
@@ -61,14 +44,6 @@
               <div class="rb-inner" id="rb-chips"></div>
             </div>
             <span class="tb-sep rb-sep">·</span>
-            <span
-              class="tb-height-main"
-              id="tb-height"
-              aria-live="polite"
-              aria-label="Block height"
-              >—</span
-            >
-            <span class="tb-sep">·</span>
             <span class="tb-clock-wrap"
               ><span id="clock">—</span><span class="tb-utc">UTC</span></span
             >
@@ -232,10 +207,15 @@
             <div class="sec">config</div>
             <div class="kv ni-kv-cfg">
               <span class="k">chain size</span
-              ><span class="v v-pair"
-                ><span id="ni-sz">—</span><span class="v-pair-sep">·</span
-                ><span class="dim" id="ni-pr">—</span></span
-              >
+              ><span class="v" id="ni-sz">—</span>
+            </div>
+            <div
+              class="kv ni-kv-cfg"
+              id="ni-pruned-row"
+              style="display: none"
+            >
+              <span class="k">pruned</span
+              ><span class="v dim" id="ni-pr">—</span>
             </div>
             <div
               class="kv ni-kv-cfg"
@@ -433,40 +413,7 @@
             ><span class="ph-meta" id="bd-ph">latest</span>
           </div>
           <div class="pb" id="block-detail-body">
-            <div class="kv">
-              <span class="k">height</span><span class="v dim">—</span>
-            </div>
-            <div class="kv">
-              <span class="k">hash</span><span class="v dim">—</span>
-            </div>
-            <div class="kv">
-              <span class="k">age · txs</span><span class="v dim">—</span>
-            </div>
-            <div class="kv">
-              <span class="k">in · out</span><span class="v dim">—</span>
-            </div>
-            <div class="kv">
-              <span class="k">size · fill</span><span class="v dim">—</span>
-            </div>
-            <div class="kv">
-              <span class="k">avg · total fee</span><span class="v dim">—</span>
-            </div>
-            <div class="kv">
-              <span class="k">subsidy · era</span><span class="v dim">—</span>
-            </div>
-            <div class="kv">
-              <span class="k">fee share</span><span class="v dim">—</span>
-            </div>
-            <div class="kv">
-              <span class="k" data-tip="signalling">signalling</span
-              ><span class="v dim">—</span>
-            </div>
-            <div class="kv">
-              <span class="k">version · bits</span><span class="v dim">—</span>
-            </div>
-            <div class="kv">
-              <span class="k">median time</span><span class="v dim">—</span>
-            </div>
+            <div class="pd-empty">select a block to inspect</div>
           </div>
         </div>
 
@@ -590,6 +537,7 @@
             >
           </div>
           <div class="peer-filter-wrap">
+            <label for="peer-filter" class="sr-only">Filter peers</label>
             <input
               type="text"
               id="peer-filter"
@@ -603,7 +551,8 @@
               <thead>
                 <tr>
                   <th>address</th>
-                  <th class="td-r" style="width: 64px">ping</th>
+                  <th class="td-r td-peer-conn-h">connected</th>
+                  <th class="td-r">ping</th>
                 </tr>
               </thead>
               <tbody id="peer-table-body"></tbody>

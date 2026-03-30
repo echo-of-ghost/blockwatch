@@ -428,7 +428,10 @@ const nodePanel = {
 
   _renderStorage(bc) {
     setText("ni-sz", bc.size_on_disk ? utils.fmtBytes(bc.size_on_disk) : "—");
-    setText("ni-pr", bc.pruned ? "yes" : "no");
+
+    const prunedRow = $("ni-pruned-row");
+    if (prunedRow) prunedRow.style.display = bc.pruned ? "" : "none";
+    if (bc.pruned) setText("ni-pr", "yes");
 
     const pruneRow = $("ni-pruneheight-row");
     if (pruneRow) pruneRow.style.display = bc.pruned ? "" : "none";

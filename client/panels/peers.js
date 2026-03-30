@@ -53,11 +53,11 @@ const peersPanel = {
 
     if (ibd && !peers.length) {
       tbody.innerHTML =
-        '<tr><td colspan="2" class="ibd-placeholder">peer data unavailable during initial sync</td></tr>';
+        '<tr><td colspan="3" class="ibd-placeholder">peer data unavailable during initial sync</td></tr>';
       return;
     }
 
-    const maxBw = peers.reduce((m, p) => Math.max(m, p.bytessent || 0, p.bytesrecv || 0), 1);
+    const now = Date.now() / 1000;
 
     tbody.innerHTML = peers
       .map((p) => {
@@ -82,8 +82,10 @@ const peersPanel = {
           (p.addr || "").replace(/:\d+$/, "").replace(/^\[(.+)\]$/, "$1"),
         );
         const ver = esc((p.subver || "").replace(/^\/|\/$/g, ""));
-        const sentPct = (((p.bytessent || 0) / maxBw) * 100).toFixed(1);
-        const recvPct = (((p.bytesrecv || 0) / maxBw) * 100).toFixed(1);
+        const bwTotal = (p.bytessent || 0) + (p.bytesrecv || 0);
+        const sentPct = bwTotal > 0 ? ((p.bytessent || 0) / bwTotal * 100).toFixed(1) : "50";
+        const recvPct = bwTotal > 0 ? ((p.bytesrecv || 0) / bwTotal * 100).toFixed(1) : "50";
+        const connAge = p.conntime ? utils.fmtAge(now - p.conntime) : "—";
 
         // Ping
         const pc =
@@ -96,7 +98,7 @@ const peersPanel = {
             : "dim";
         const ping =
           p.pingtime > 0 ? Math.round(p.pingtime * 1000) + "ms" : "—";
-        const pingCell = `<span class="ping-cell"><span class="ping-dot ${pc}"></span><span class="ping-val td-${pc}">${ping}</span></span>`;
+        const pingCell = `<span class="ping-val td-${pc}">${ping}</span>`;
 
         return `<tr data-pid="${p.id}" role="row" tabindex="0" aria-selected="${isSel}"
         class="${isSel ? "peer-sel" : ""}">
@@ -109,17 +111,17 @@ const peersPanel = {
             </span>
           </div>
           <span class="peer-ver-text">${ver}</span>
-          <div class="peer-bars-group">
-            <div class="peer-bar-row">
-              <div class="peer-bar-track"><div class="peer-bar-fill bar-sent" style="width:${sentPct}%"></div></div>
-              <span class="peer-bar-val sent">↑ ${utils.fmtBytes(p.bytessent || 0)}</span>
+          <div class="peer-bw-split">
+            <div class="peer-bw-track">
+              <div class="peer-bw-sent" style="width:${sentPct}%"></div>
+              <div class="peer-bw-recv" style="width:${recvPct}%"></div>
             </div>
-            <div class="peer-bar-row">
-              <div class="peer-bar-track"><div class="peer-bar-fill bar-recv" style="width:${recvPct}%"></div></div>
-              <span class="peer-bar-val recv">↓ ${utils.fmtBytes(p.bytesrecv || 0)}</span>
-            </div>
+            <span class="peer-bw-label sent">↑ ${utils.fmtBytes(p.bytessent || 0)}</span>
+            <span class="peer-bw-sep">·</span>
+            <span class="peer-bw-label recv">↓ ${utils.fmtBytes(p.bytesrecv || 0)}</span>
           </div>
         </td>
+        <td class="td-peer-conn">${connAge}</td>
         <td class="td-peer-ping">${pingCell}</td>
       </tr>`;
       })
@@ -263,6 +265,11 @@ const peersPanel = {
       </div>`
       : "";
 
+    // ── bandwidth split bar ──────────────────────────────────────────────────
+    const bwTotal = (p.bytessent || 0) + (p.bytesrecv || 0);
+    const sentPct = bwTotal > 0 ? ((p.bytessent || 0) / bwTotal * 100).toFixed(1) : "50";
+    const recvPct = bwTotal > 0 ? ((p.bytesrecv || 0) / bwTotal * 100).toFixed(1) : "50";
+
     const header = `
       <div class="pd-header">
         <div class="pd-header-top">
@@ -279,16 +286,36 @@ const peersPanel = {
         </div>
       </div>`;
 
+    // ── hero row: ping + connected ───────────────────────────────────────────
+    const hero = `
+      <div class="pd-hero">
+        <div class="pd-hero-item">
+          <span class="pd-hero-arrow pd-hero-ping">◎</span>
+          <span class="pd-hero-val ${pingCls}" data-pd="ping">${pingMs != null ? pingMs + "ms" : "—"}</span>
+          <span class="pd-hero-lbl">ping${p.minping > 0 ? " · min " + Math.round(p.minping * 1000) + "ms" : ""}</span>
+        </div>
+        <div class="pd-hero-item">
+          <span class="pd-hero-val dim" data-pd="conntime">${p.conntime ? utils.fmtAge(now - p.conntime) : "—"}</span>
+          <span class="pd-hero-lbl">connected</span>
+        </div>
+      </div>`;
+
+    // ── bandwidth section ────────────────────────────────────────────────────
+    const bw = `
+      <div class="pd-bw-section">
+        <div class="pd-bw-track">
+          <div class="pd-bw-bar-sent" style="width:${sentPct}%" data-pd="bw-bar-sent"></div>
+          <div class="pd-bw-bar-recv" style="width:${recvPct}%" data-pd="bw-bar-recv"></div>
+        </div>
+        <div class="pd-bw-labels">
+          <span class="pd-bw-lbl-sent" data-pd="bw-sent">↑ ${utils.fmtBytes(p.bytessent || 0)}</span>
+          <span class="pd-bw-lbl-recv" data-pd="bw-recv">↓ ${utils.fmtBytes(p.bytesrecv || 0)}</span>
+        </div>
+      </div>`;
+
+    // ── compact stat grid: protocol + sync only ──────────────────────────────
     const statGrid = `
       <div class="pd-stat-grid">
-        <div class="pd-stat-cell">
-          <span class="pd-stat-val ${pingCls}" data-pd="ping">${pingMs != null ? pingMs + "ms" : "—"}</span>
-          <span class="pd-stat-lbl">ping${p.minping > 0 ? " · min " + Math.round(p.minping * 1000) + "ms" : ""}</span>
-        </div>
-        <div class="pd-stat-cell">
-          <span class="pd-stat-val dim" data-pd="conntime">${p.conntime ? utils.fmtAge(now - p.conntime) : "—"}</span>
-          <span class="pd-stat-lbl">connected</span>
-        </div>
         <div class="pd-stat-cell">
           <span class="pd-stat-val dim">${p.version ? esc(String(p.version)) : "—"}</span>
           <span class="pd-stat-lbl">protocol</span>
@@ -305,23 +332,13 @@ const peersPanel = {
           <span class="pd-stat-val dim">${p.startingheight ? fb(p.startingheight) : "—"}</span>
           <span class="pd-stat-lbl">start height</span>
         </div>
-        <div class="pd-stat-cell">
-          <span class="pd-stat-val sent" data-pd="bw-sent">↑ ${utils.fmtBytes(p.bytessent || 0)}</span>
-          <span class="pd-stat-lbl">sent</span>
-        </div>
-        <div class="pd-stat-cell">
-          <span class="pd-stat-val recv" data-pd="bw-recv">↓ ${utils.fmtBytes(p.bytesrecv || 0)}</span>
-          <span class="pd-stat-lbl">recv</span>
-        </div>
       </div>`;
 
     const sections = `
       <div class="pd-body">
         <div class="pd-section">
           <div class="pd-section-label">sync</div>
-          <div class="pd-kv"><span class="k">headers</span><span class="v dim" data-pd="synced-headers">${fb(p.synced_headers || 0)}</span></div>
           <div class="pd-kv"><span class="k">hdr–blk gap</span><span class="v ${hdrBlkGap > 10 ? "o" : "dim"}" data-pd="hdr-blk-gap">${fb(hdrBlkGap)}</span></div>
-          <div class="pd-kv"><span class="k">start height</span><span class="v dim">${fb(p.startingheight || 0)}</span></div>
           <div class="pd-kv"><span class="k">HB to peer</span><span class="v ${p.bip152_hb_to ? "grn" : "dim"}">${p.bip152_hb_to != null ? (p.bip152_hb_to ? "high-bw" : "low-bw") : "—"}</span></div>
           <div class="pd-kv"><span class="k">HB from peer</span><span class="v ${p.bip152_hb_from ? "grn" : "dim"}">${p.bip152_hb_from != null ? (p.bip152_hb_from ? "high-bw" : "low-bw") : "—"}</span></div>
         </div>
@@ -363,7 +380,7 @@ const peersPanel = {
         </div>
       </div>`;
 
-    if (body) body.innerHTML = header + statGrid + sections;
+    if (body) body.innerHTML = header + hero + bw + statGrid + sections;
     this._wireActions(p, body);
   },
 
@@ -374,36 +391,28 @@ const peersPanel = {
       const el = body.querySelector(`[data-pd="${key}"]`);
       if (el && el.textContent !== val) el.textContent = val;
     };
+    const setStyle = (key, prop, val) => {
+      const el = body.querySelector(`[data-pd="${key}"]`);
+      if (el) el.style[prop] = val;
+    };
     const pingMs = p.pingtime > 0 ? Math.round(p.pingtime * 1000) : null;
     set("ping", pingMs != null ? pingMs + "ms" : "—");
     set("conntime", p.conntime ? utils.fmtAge(now - p.conntime) : "—");
+    set("synced-headers", p.synced_headers ? fb(p.synced_headers) : "—");
     set("synced-blocks", p.synced_blocks ? fb(p.synced_blocks) : "—");
+    set("hdr-blk-gap", fb((p.synced_headers || 0) - (p.synced_blocks || 0)));
     set("bw-sent", "↑ " + utils.fmtBytes(p.bytessent || 0));
     set("bw-recv", "↓ " + utils.fmtBytes(p.bytesrecv || 0));
-    set("synced-headers", fb(p.synced_headers || 0));
-    set("hdr-blk-gap", fb((p.synced_headers || 0) - (p.synced_blocks || 0)));
+    // update split bar widths
+    const bwTotal = (p.bytessent || 0) + (p.bytesrecv || 0);
+    setStyle("bw-bar-sent", "width", (bwTotal > 0 ? (p.bytessent || 0) / bwTotal * 100 : 50).toFixed(1) + "%");
+    setStyle("bw-bar-recv", "width", (bwTotal > 0 ? (p.bytesrecv || 0) / bwTotal * 100 : 50).toFixed(1) + "%");
     set("lastsend", p.lastsend > 0 ? utils.fmtAgeAgo(now - p.lastsend) : "—");
     set("lastrecv", p.lastrecv > 0 ? utils.fmtAgeAgo(now - p.lastrecv) : "—");
-    set(
-      "last-block",
-      p.last_block > 0 ? utils.fmtAgeAgo(now - p.last_block) : "—",
-    );
-    set(
-      "last-block-grid",
-      p.last_block > 0 ? utils.fmtAgeAgo(now - p.last_block) : "—",
-    );
-    set(
-      "last-tx",
-      p.last_transaction > 0 ? utils.fmtAgeAgo(now - p.last_transaction) : "—",
-    );
-    set(
-      "addr-processed",
-      p.addr_processed != null ? fb(p.addr_processed) : "—",
-    );
-    set(
-      "addr-rate-lim",
-      p.addr_rate_limited != null ? fb(p.addr_rate_limited) : "—",
-    );
+    set("last-block", p.last_block > 0 ? utils.fmtAgeAgo(now - p.last_block) : "—");
+    set("last-tx", p.last_transaction > 0 ? utils.fmtAgeAgo(now - p.last_transaction) : "—");
+    set("addr-processed", p.addr_processed != null ? fb(p.addr_processed) : "—");
+    set("addr-rate-lim", p.addr_rate_limited != null ? fb(p.addr_rate_limited) : "—");
     const sm = p.bytessent_per_msg || {},
       rm = p.bytesrecv_per_msg || {};
     [...new Set([...Object.keys(sm), ...Object.keys(rm)])].forEach((k) =>

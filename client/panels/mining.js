@@ -44,7 +44,7 @@ const blocksPanel = {
             : fillPct >= 50
               ? "var(--orange)"
               : fillPct >= 20
-                ? "var(--pos)"
+                ? "var(--amber)"
                 : "var(--t4)";
 
         return `<tr class="${isNew ? "new" : ""} ${isSel ? "peer-sel" : ""}" role="row" tabindex="0" aria-selected="${isSel}" data-bheight="${b.height}">
@@ -99,7 +99,7 @@ const blocksPanel = {
         : fillPct >= 50
           ? "var(--orange)"
           : fillPct >= 20
-            ? "var(--pos)"
+            ? "var(--amber)"
             : "var(--t4)";
     const fillBadgeCls =
       fillPct >= 85
@@ -286,6 +286,8 @@ const blocksPanel = {
         </div>
 
       </div>`;
+
+    this._bindHeightSearch();
   },
 
   selectByHeight(height) {
@@ -300,5 +302,80 @@ const blocksPanel = {
       );
     const b = this._cache.find((x) => x.height === height);
     if (b) this.renderDetail(b);
+  },
+
+  _searchActive: false,
+
+  _bindHeightSearch() {
+    const el = $q("#block-detail-body .bd-height");
+    if (!el) return;
+
+    el.setAttribute("role", "button");
+    el.setAttribute("tabindex", "0");
+    el.setAttribute("aria-label", "Click to jump to a block height");
+
+    const activate = () => {
+      if (this._searchActive) return;
+      this._searchActive = true;
+
+      const height = this._selectedHeight;
+      const wrap = document.createElement("span");
+      wrap.className = "bd-height";
+      const hash = document.createElement("span");
+      hash.textContent = "#";
+      const input = document.createElement("input");
+      input.type = "text";
+      input.className = "bd-height-input";
+      input.setAttribute("aria-label", "Jump to block height");
+      if (height != null) input.value = height;
+      input.style.width = Math.max(5, String(height ?? "").length + 1) + "ch";
+      wrap.appendChild(hash);
+      wrap.appendChild(input);
+
+      el.replaceWith(wrap);
+      input.select();
+
+      const restore = () => {
+        this._searchActive = false;
+        const span = document.createElement("span");
+        span.className = "bd-height";
+        span.style.cursor = "text";
+        span.textContent = this._selectedHeight != null ? "#" + fb(this._selectedHeight) : "—";
+        wrap.replaceWith(span);
+        this._bindHeightSearch();
+      };
+
+      let _submitted = false;
+
+      input.addEventListener("keydown", async (ev) => {
+        if (ev.key === "Escape") { restore(); return; }
+        if (ev.key !== "Enter") return;
+        ev.preventDefault();
+        const val = parseInt(input.value.trim(), 10);
+        if (isNaN(val) || val < 0) { restore(); return; }
+        _submitted = true;
+        input.disabled = true;
+        try {
+          const res = await fetch(`/api/block/${val}`);
+          const block = await res.json();
+          if (block.error) throw new Error(block.error);
+          this._searchActive = false;
+          this._selectedHeight = block.height;
+          $("blk-body")?.querySelectorAll("tr").forEach(r => r.classList.remove("peer-sel"));
+          this.renderDetail(block);
+        } catch (_) {
+          restore();
+        }
+      });
+
+      input.addEventListener("blur", () => {
+        if (this._searchActive && !_submitted) restore();
+      });
+    };
+
+    el.addEventListener("click", activate);
+    el.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); activate(); }
+    });
   },
 };
