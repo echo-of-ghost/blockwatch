@@ -90,7 +90,7 @@ const network = {
     ).trim();
     const sentRgb = (
       getComputedStyle(document.documentElement).getPropertyValue(
-        "--pos-rgb",
+        "--amber-rgb",
       ) || "196,137,74"
     ).trim();
 

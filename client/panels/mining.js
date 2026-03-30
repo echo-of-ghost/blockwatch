@@ -44,7 +44,7 @@ const blocksPanel = {
             : fillPct >= 50
               ? "var(--orange)"
               : fillPct >= 20
-                ? "var(--pos)"
+                ? "var(--amber)"
                 : "var(--t4)";
 
         return `<tr class="${isNew ? "new" : ""} ${isSel ? "peer-sel" : ""}" role="row" tabindex="0" aria-selected="${isSel}" data-bheight="${b.height}">
@@ -99,7 +99,7 @@ const blocksPanel = {
         : fillPct >= 50
           ? "var(--orange)"
           : fillPct >= 20
-            ? "var(--pos)"
+            ? "var(--amber)"
             : "var(--t4)";
     const fillBadgeCls =
       fillPct >= 85
@@ -310,7 +310,11 @@ const blocksPanel = {
     const el = $q("#block-detail-body .bd-height");
     if (!el) return;
 
-    el.addEventListener("click", () => {
+    el.setAttribute("role", "button");
+    el.setAttribute("tabindex", "0");
+    el.setAttribute("aria-label", "Click to jump to a block height");
+
+    const activate = () => {
       if (this._searchActive) return;
       this._searchActive = true;
 
@@ -322,6 +326,7 @@ const blocksPanel = {
       const input = document.createElement("input");
       input.type = "text";
       input.className = "bd-height-input";
+      input.setAttribute("aria-label", "Jump to block height");
       if (height != null) input.value = height;
       input.style.width = Math.max(5, String(height ?? "").length + 1) + "ch";
       wrap.appendChild(hash);
@@ -366,6 +371,11 @@ const blocksPanel = {
       input.addEventListener("blur", () => {
         if (this._searchActive && !_submitted) restore();
       });
+    };
+
+    el.addEventListener("click", activate);
+    el.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); activate(); }
     });
   },
 };
