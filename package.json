@@ -32,6 +32,7 @@
       "blockwatch.css",
       "robots.txt",
       "*.woff2",
+      "assets/**",
       "client/**",
       "electron/**",
       "node_modules/**"
