@@ -53,11 +53,11 @@ const peersPanel = {
 
     if (ibd && !peers.length) {
       tbody.innerHTML =
-        '<tr><td colspan="2" class="ibd-placeholder">peer data unavailable during initial sync</td></tr>';
+        '<tr><td colspan="3" class="ibd-placeholder">peer data unavailable during initial sync</td></tr>';
       return;
     }
 
-    const maxBw = peers.reduce((m, p) => Math.max(m, p.bytessent || 0, p.bytesrecv || 0), 1);
+    const now = Date.now() / 1000;
 
     tbody.innerHTML = peers
       .map((p) => {
@@ -82,8 +82,10 @@ const peersPanel = {
           (p.addr || "").replace(/:\d+$/, "").replace(/^\[(.+)\]$/, "$1"),
         );
         const ver = esc((p.subver || "").replace(/^\/|\/$/g, ""));
-        const sentPct = (((p.bytessent || 0) / maxBw) * 100).toFixed(1);
-        const recvPct = (((p.bytesrecv || 0) / maxBw) * 100).toFixed(1);
+        const bwTotal = (p.bytessent || 0) + (p.bytesrecv || 0);
+        const sentPct = bwTotal > 0 ? ((p.bytessent || 0) / bwTotal * 100).toFixed(1) : "50";
+        const recvPct = bwTotal > 0 ? ((p.bytesrecv || 0) / bwTotal * 100).toFixed(1) : "50";
+        const connAge = p.conntime ? utils.fmtAge(now - p.conntime) : "—";
 
         // Ping
         const pc =
@@ -96,7 +98,7 @@ const peersPanel = {
             : "dim";
         const ping =
           p.pingtime > 0 ? Math.round(p.pingtime * 1000) + "ms" : "—";
-        const pingCell = `<span class="ping-cell"><span class="ping-dot ${pc}"></span><span class="ping-val td-${pc}">${ping}</span></span>`;
+        const pingCell = `<span class="ping-val td-${pc}">${ping}</span>`;
 
         return `<tr data-pid="${p.id}" role="row" tabindex="0" aria-selected="${isSel}"
         class="${isSel ? "peer-sel" : ""}">
@@ -109,17 +111,17 @@ const peersPanel = {
             </span>
           </div>
           <span class="peer-ver-text">${ver}</span>
-          <div class="peer-bars-group">
-            <div class="peer-bar-row">
-              <div class="peer-bar-track"><div class="peer-bar-fill bar-sent" style="width:${sentPct}%"></div></div>
-              <span class="peer-bar-val sent">↑ ${utils.fmtBytes(p.bytessent || 0)}</span>
+          <div class="peer-bw-split">
+            <div class="peer-bw-track">
+              <div class="peer-bw-sent" style="width:${sentPct}%"></div>
+              <div class="peer-bw-recv" style="width:${recvPct}%"></div>
             </div>
-            <div class="peer-bar-row">
-              <div class="peer-bar-track"><div class="peer-bar-fill bar-recv" style="width:${recvPct}%"></div></div>
-              <span class="peer-bar-val recv">↓ ${utils.fmtBytes(p.bytesrecv || 0)}</span>
-            </div>
+            <span class="peer-bw-label sent">↑ ${utils.fmtBytes(p.bytessent || 0)}</span>
+            <span class="peer-bw-sep">·</span>
+            <span class="peer-bw-label recv">↓ ${utils.fmtBytes(p.bytesrecv || 0)}</span>
           </div>
         </td>
+        <td class="td-peer-conn">${connAge}</td>
         <td class="td-peer-ping">${pingCell}</td>
       </tr>`;
       })
