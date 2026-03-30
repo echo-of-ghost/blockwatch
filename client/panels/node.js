@@ -40,7 +40,6 @@ const nodePanel = {
     this._renderNodeInfo(bc, ni, d.rpcNode, blocks, now);
     this._renderChainTips(d.chainTips || []);
     this._renderRetarget(bc.blocks || 0, bc.mediantime || 0, cts);
-    this._renderDeployments(d.deploymentInfo);
     this._renderConsensus(bc, cts);
     this._renderStorage(bc);
     this._renderNetworkReachability(ni);
@@ -581,54 +580,5 @@ const nodePanel = {
         "h";
 
     setText("sync-eta", pct.toFixed(3) + "%  · est. " + eta);
-  },
-
-  _renderDeployments(deploymentInfo) {
-    const el = $("mn-softforks");
-    if (!el) return;
-
-    const deployments = deploymentInfo?.deployments || {};
-    const entries = Object.entries(deployments);
-    if (!entries.length) {
-      el.innerHTML = '<div class="fork-empty">no deployment data</div>';
-      return;
-    }
-
-    // Sort: in-progress first (started, locked_in), then active bip9, then buried, then defined/failed
-    const order = { started: 0, locked_in: 1, active: 2, buried: 3, defined: 4, failed: 5 };
-    const sorted = entries.slice().sort(([, a], [, b]) => {
-      const sa = a.type === "bip9" ? (a.bip9?.status || "defined") : a.type;
-      const sb = b.type === "bip9" ? (b.bip9?.status || "defined") : b.type;
-      return (order[sa] ?? 9) - (order[sb] ?? 9);
-    });
-
-    el.innerHTML = sorted.map(([name, fork]) => {
-      let badgeCls, badgeText, meta = "";
-
-      if (fork.type === "buried") {
-        badgeCls = "buried"; badgeText = "buried";
-        meta = fork.height ? "#" + fb(fork.height) : "";
-      } else if (fork.type === "bip9") {
-        const s = fork.bip9?.status || "defined";
-        if (s === "active")    { badgeCls = "active";  badgeText = "active"; meta = fork.bip9.since ? "#" + fb(fork.bip9.since) : ""; }
-        else if (s === "locked_in") { badgeCls = "locked"; badgeText = "locked in"; meta = fork.bip9.since ? "#" + fb(fork.bip9.since) : ""; }
-        else if (s === "started") {
-          badgeCls = "signal"; badgeText = "signalling";
-          const st = fork.bip9.statistics;
-          meta = st ? st.count + " / " + st.threshold : "";
-        }
-        else if (s === "failed") { badgeCls = "failed"; badgeText = "failed"; }
-        else { badgeCls = "defined"; badgeText = "defined"; }
-      } else {
-        badgeCls = fork.active ? "active" : "defined";
-        badgeText = fork.active ? "active" : fork.type;
-      }
-
-      return `<div class="fork-row">
-        <span class="fork-name">${esc(name)}</span>
-        ${meta ? `<span class="fork-meta">${esc(meta)}</span>` : ""}
-        <span class="fork-badge ${badgeCls}">${esc(badgeText)}</span>
-      </div>`;
-    }).join("");
   },
 };
