@@ -1345,6 +1345,27 @@ a.ext-link:hover { color: var(--orange); }
   line-height: 1;
   font-family: var(--sans);
   flex-shrink: 0;
+  cursor: text;
+}
+.bd-height-input::selection { background: rgba(var(--orange-rgb), .35); color: var(--t1); }
+.bd-height-input {
+  accent-color: var(--orange);
+  font-size: var(--fs-2xl);
+  font-weight: 300;
+  color: var(--t1);
+  letter-spacing: -.03em;
+  line-height: 1;
+  font-family: var(--sans);
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 0;
+  margin: 0;
+  min-width: 4ch;
+  vertical-align: baseline;
+  display: inline;
+  height: 1em;
+  box-sizing: content-box;
 }
 .bd-hash-wrap {
   font-size: var(--fs-xs);
