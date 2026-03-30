@@ -621,8 +621,8 @@ a.ext-link:hover { color: var(--orange); }
 .pd-header-net.net-onion { background: var(--odim); color: var(--orange); }
 .pd-header-net.net-i2p   { background: var(--raised); color: var(--t3); }
 .pd-header-addr {
-  font-size: var(--fs-xl); font-weight: 300; color: var(--t1);
-  letter-spacing: -.01em; font-family: var(--sans);
+  font-size: var(--fs-xl); font-weight: 400; color: var(--t1);
+  letter-spacing: 0; font-family: var(--mono);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0;
 }
 .pd-header-copy { color: var(--t4); font-size: var(--fs-xs); cursor: pointer; flex-shrink: 0; transition: color var(--t-fast); }
@@ -642,6 +642,54 @@ a.ext-link:hover { color: var(--orange); }
 .pd-badge-ua  { background: var(--raised); color: var(--t3); font-family: var(--mono); }
 .pd-badge-v2  { background: var(--grn-dim); color: var(--grn); }
 .pd-badge-asn { background: transparent; color: var(--t4); border: 1px solid var(--border); }
+
+/* ── Peer detail hero row: ping + connected ── */
+.pd-hero {
+  display: flex; padding: 10px 12px 8px; gap: 0;
+  border-bottom: 1px solid var(--border); flex-shrink: 0;
+  background: var(--ink);
+}
+.pd-hero-item {
+  flex: 1; display: flex; align-items: baseline; gap: 6px;
+}
+.pd-hero-item + .pd-hero-item {
+  border-left: 1px solid var(--border); padding-left: 14px;
+}
+.pd-hero-arrow { font-size: var(--fs-xs); color: var(--t4); flex-shrink: 0; }
+.pd-hero-val {
+  font-size: var(--fs-xl); font-weight: 300; line-height: 1;
+  font-family: var(--mono); letter-spacing: -.01em;
+}
+.pd-hero-val.grn { color: var(--grn); }
+.pd-hero-val.neg { color: var(--neg); }
+.pd-hero-val.dim { color: var(--t1); }
+.pd-hero-lbl {
+  font-size: var(--fs-xs); color: var(--t4); font-family: var(--sans);
+  letter-spacing: .04em; white-space: nowrap; align-self: flex-end; padding-bottom: 2px;
+}
+
+/* ── Peer detail bandwidth bar ── */
+.pd-bw-section {
+  padding: 8px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.pd-bw-track {
+  height: 6px; background: var(--raised); border-radius: 3px;
+  overflow: hidden; display: flex; margin-bottom: 5px;
+}
+.pd-bw-bar-sent {
+  height: 100%; background: var(--amber);
+  transition: width .9s cubic-bezier(.4,0,.2,1);
+}
+.pd-bw-bar-recv {
+  height: 100%; background: var(--orange); opacity: .75;
+  transition: width .9s cubic-bezier(.4,0,.2,1);
+}
+.pd-bw-labels {
+  display: flex; justify-content: space-between;
+  font-size: var(--fs-xs); font-family: var(--mono);
+}
+.pd-bw-lbl-sent { color: var(--amber); }
+.pd-bw-lbl-recv { color: var(--orange); opacity: .85; }
 
 .pd-stat-grid {
   display: grid; grid-template-columns: 1fr 1fr;
@@ -770,6 +818,7 @@ a.ext-link:hover { color: var(--orange); }
 .fork-badge.defined { background:transparent; color:var(--t4); border:1px solid var(--border); }
 .fork-badge.failed  { background:var(--neg-dim); color:var(--neg); }
 .fork-badge.buried  { background:var(--grn-dim); color:var(--grn2); }
+.fork-empty { font-size: var(--fs-xs); color: var(--t4); padding: 4px 0; font-family: var(--sans); }
 
 /* ── Node panel — tip age hero (replaces redundant height) ── */
 .ni-tipage-hero {
