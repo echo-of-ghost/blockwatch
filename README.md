@@ -81,7 +81,7 @@ gpg --verify Blockwatch-2.0.0.AppImage.asc Blockwatch-2.0.0.AppImage
 
 A good signature looks like:
 ```
-gpg: Good signature from "Your Name <you@example.com>"
+gpg: Good signature from "Maple <maplehodl@protonmail.com>"
 ```
 
 Any `BAD signature` result means the file has been tampered with — do not run it.
