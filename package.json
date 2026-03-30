@@ -26,6 +26,7 @@
   "build": {
     "appId": "com.blockwatch.dashboard",
     "productName": "Blockwatch",
+    "icon": "assets/icon.png",
     "files": [
       "server.js",
       "index.html",
@@ -42,5 +43,6 @@
       "category": "Finance"
     }
   },
+  "author": "Maple <maplehodl@protonmail.com>",
   "license": "GPL-3.0"
 }
