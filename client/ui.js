@@ -34,7 +34,6 @@ const layout = {
     mining: "Mining",
     peers: "Peers",
     services: "Services",
-    banned: "Banned",
     "peer-detail": "Peer",
   },
 
@@ -45,7 +44,6 @@ const layout = {
     "block-detail",
     "peers",
     "peer-detail",
-    "banned",
     "mining",
     "mempool-viz",
     "block-timing",
@@ -70,13 +68,12 @@ const layout = {
       { name: "mining", hf: 0.34 },
     ],
     [
-      { name: "peers", hf: 0.38 },
-      { name: "banned", hf: 0.08 },
+      { name: "peers", hf: 0.46 },
       { name: "peer-detail", hf: 0.54 },
     ],
   ],
 
-  _LS_KEY: "bw_layout_v42",
+  _LS_KEY: "bw_layout_v43",
 
   // ── Geometry helpers ─────────────────────────────────────────────────────────
 

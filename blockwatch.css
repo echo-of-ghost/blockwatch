@@ -36,6 +36,7 @@
   --amber-rgb: 196,137,74;
   --net:     var(--t3);
   --neg:     #d05858;
+  --neg-rgb: 208,88,88;
   --grn:     #559e65;
   --grn-rgb: 85,158,101;
   --mono:    'Geist Mono', monospace;
@@ -740,12 +741,14 @@ a.ext-link:hover { color: var(--orange); }
 .pa-btn:active { opacity: .6; }
 .pa-btn.pa-working { opacity: .25; pointer-events: none; }
 
-/* ── Ban panel ── */
-#ban-rows.scroll-area { padding: 4px 12px 8px; }
+/* ── Ban inline section (inside peers scroll area) ── */
+.ban-inline-sec { padding: 4px 12px 8px; }
+.ban-inline-hdr { display: flex; align-items: center; gap: 6px; padding: 10px 0 5px; border-bottom: 1px solid rgba(255,255,255,.018); margin-bottom: 2px; }
+.ban-inline-label { font-size: var(--fs-xs); color: var(--neg); font-family: var(--sans); font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.ban-inline-count { font-size: var(--fs-xs); font-weight: 600; font-family: var(--mono); padding: 1px 5px; border-radius: 2px; background: rgba(var(--neg-rgb), .15); color: var(--neg); line-height: 1; }
 .ban-row { display:flex; align-items:baseline; gap:6px; padding:3px 0; }
 .ban-row-addr { font-size:var(--fs-xs); font-family:var(--mono); color:var(--t3); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0; }
-.ban-row-exp  { font-size:var(--fs-xs); color:var(--t3); flex-shrink:0; white-space:nowrap; }
-.ban-empty    { font-size:var(--fs-xs); color:var(--t4); padding:8px 0; }
+.ban-row-exp  { font-size:var(--fs-xs); color:var(--t4); flex-shrink:0; white-space:nowrap; }
 .pa-btn.pa-unban { background:var(--grn-dim); color:var(--grn); font-size:var(--fs-xs); padding:1px 7px; flex-shrink:0; }
 .pa-btn.pa-unban:hover { background:var(--grn-dim); filter: brightness(1.5); color:var(--grn); }
 
@@ -930,6 +933,10 @@ a.ext-link:hover { color: var(--orange); }
 
 /* ── Services grid ── */
 .svc-grid { min-height: 0; }
+.svc-tip { cursor: default; transition: opacity var(--t-fast); }
+.svc-with-tips:has(.svc-tip:hover) .svc-tip:not(:hover) { opacity: 0.4; }
+.svc-desc { font-size: var(--fs-xs); color: var(--t4); font-family: var(--sans); padding: 6px 0 2px; min-height: 2.4em; line-height: 1.4; opacity: 0; transition: opacity var(--t-fast); pointer-events: none; }
+.svc-desc.svc-desc-visible { opacity: 1; }
 
 
 /* ══════════════════════════════════════════════════════════════════════════════

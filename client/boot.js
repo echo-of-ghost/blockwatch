@@ -61,6 +61,25 @@ charts.init();
 // Bandwidth chart hover
 network._initHover();
 
+// Services badge hover description
+document.addEventListener('mouseover', e => {
+  const badge = e.target.closest('.svc-tip[data-svc-tip]');
+  const desc = $('svc-desc');
+  if (!desc) return;
+  if (badge && badge.dataset.svcTip) {
+    desc.textContent = badge.dataset.svcTip;
+    desc.classList.add('svc-desc-visible');
+  } else if (!e.target.closest('.svc-with-tips')) {
+    desc.classList.remove('svc-desc-visible');
+  }
+});
+document.addEventListener('mouseout', e => {
+  if (!e.target.closest('.svc-with-tips')) {
+    const desc = $('svc-desc');
+    if (desc) desc.classList.remove('svc-desc-visible');
+  }
+});
+
 // Global copy-to-clipboard delegation
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-copy]');

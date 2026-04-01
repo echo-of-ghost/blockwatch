@@ -516,10 +516,20 @@ const nodePanel = {
     const svcs = ni.localservicesnames || [];
     setText("svc-ph", svcs.length ? svcs.length + " active" : "—");
 
+    const SVC_DESC = {
+      NETWORK:          "Full block relay — serves complete historical blocks to peers",
+      GETUTXO:          "Can respond to UTXO queries (rarely used)",
+      BLOOM:            "Supports Bloom filter queries for SPV clients",
+      WITNESS:          "SegWit-capable — validates and relays witness data",
+      COMPACT_FILTERS:  "Serves BIP-157/158 compact block filters for light clients",
+      NETWORK_LIMITED:  "Pruned node — serves only recent blocks, not full history",
+      P2P_V2:           "BIP-324 encrypted transport — peers can connect over v2",
+    };
+
     const grid = $("svc-grid");
     if (grid) {
       grid.innerHTML =
-        '<div class="pd-svc">' +
+        '<div class="pd-svc svc-with-tips">' +
         svcs
           .map((s) => {
             const cls = ["NETWORK", "WITNESS"].includes(s)
@@ -527,10 +537,12 @@ const nodePanel = {
               : ["BLOOM", "COMPACT_FILTERS", "P2P_V2"].includes(s)
                 ? "svc-cap"
                 : "svc-ltd";
-            return `<span class="${cls}">${esc(s)}</span>`;
+            const desc = SVC_DESC[s] || "";
+            return `<span class="${cls} svc-tip" data-svc-tip="${esc(desc)}">${esc(s)}</span>`;
           })
           .join("") +
-        "</div>";
+        "</div>" +
+        '<div class="svc-desc" id="svc-desc"></div>';
     }
   },
 

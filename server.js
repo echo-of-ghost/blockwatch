@@ -752,24 +752,34 @@ async function onNewBlock() {
     }
 
     // Dedup: skip if we've already processed this height
-    if (bc.blocks <= (_state.blocks[0]?.height ?? -1)) return;
-
-    const blockHash = bc.bestblockhash;
-    if (!blockHash) return;
+    const knownHeight = _state.blocks[0]?.height ?? -1;
+    if (bc.blocks <= knownHeight) return;
 
     const ibd = bc.initialblockdownload || false;
-    const [hdr, st, mi, cts] = await Promise.all([
-      safe("getblockheader", [blockHash, true]),
+    const maxBlocks = ibd ? 8 : 24;
+
+    // Gap fill: if more than one block arrived since last update, fetch them all
+    const gap = bc.blocks - knownHeight;
+    const fetchCount = Math.min(gap, maxBlocks);
+    const heights = Array.from({ length: fetchCount }, (_, i) => bc.blocks - i);
+
+    const hashes = await Promise.all(heights.map(h => safe("getblockhash", [h])));
+
+    const [headers, stats, mi, cts] = await Promise.all([
+      Promise.all(hashes.map(h => h ? safe("getblockheader", [h, true]) : null)),
       ibd
-        ? Promise.resolve(null)
-        : safe("getblockstats", [blockHash, BLOCK_STATS_FIELDS]),
+        ? Promise.resolve(heights.map(() => null))
+        : Promise.all(hashes.map(h => h ? safe("getblockstats", [h, BLOCK_STATS_FIELDS]) : null)),
       safe("getmempoolinfo"),
       safe("getchaintxstats", [Math.min(2016, bc.blocks || 1)]),
     ]);
 
-    // If the block header failed, skip the block update rather than pushing
-    // a broken entry into state. blockchain + mempool still update below.
-    if (!hdr) {
+    const newBlocks = hashes
+      .map((hash, i) => hash && headers[i] ? normalizeBlock(hash, headers[i], stats[i]) : null)
+      .filter(Boolean);
+
+    // If the tip header failed, still update blockchain + mempool
+    if (!newBlocks.length) {
       _state.blockchain = bc;
       if (mi) _state.mempoolInfo = mi;
       if (cts) _state.chainTxStats = cts;
@@ -779,11 +789,8 @@ async function onNewBlock() {
       return;
     }
 
-    const newBlock = normalizeBlock(blockHash, hdr, st);
-    const maxBlocks = ibd ? 8 : 24;
-
     _state.blockchain = bc;
-    _state.blocks = [newBlock, ..._state.blocks].slice(0, maxBlocks);
+    _state.blocks = [...newBlocks, ..._state.blocks].slice(0, maxBlocks);
     if (mi) _state.mempoolInfo = mi;
     if (cts) _state.chainTxStats = cts;
     delete _state.error;

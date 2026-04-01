@@ -594,9 +594,10 @@ const peersPanel = {
 // BAN LIST MODULE
 // ═══════════════════════════════════════════════════════════════════════════════
 const banList = {
+  _lastHtml: null,
+
   async refresh() {
-    const rowsEl = $("ban-rows");
-    const phEl = $("ban-ph");
+    const rowsEl = $("ban-inline");
     if (!rowsEl) return;
 
     let bans = [];
@@ -607,31 +608,39 @@ const banList = {
     }
 
     if (!bans || !bans.length) {
-      if (phEl) phEl.textContent = "—";
-      rowsEl.innerHTML = '<div class="ban-empty">no bans</div>';
+      if (this._lastHtml !== "") { this._lastHtml = ""; rowsEl.innerHTML = ""; }
       return;
     }
 
-    if (phEl)
-      phEl.textContent =
-        bans.length + (bans.length === 1 ? " address" : " addresses");
+    const html =
+      '<div class="ban-inline-sec">' +
+      '<div class="ban-inline-hdr">' +
+      '<span class="ban-inline-label">banned</span>' +
+      '<span class="ban-inline-count">' + bans.length + '</span>' +
+      '</div>' +
+      bans
+        .map(
+          (b) =>
+            '<div class="ban-row">' +
+            '<span class="ban-row-addr">' +
+            esc(b.address || "") +
+            "</span>" +
+            '<span class="ban-row-exp">' +
+            (b.ban_created ? "banned " + utils.fmtAge(Date.now() / 1000 - b.ban_created) + " ago · " : "") +
+            utils.fmtBanLeft(b) +
+            "</span>" +
+            '<button type="button" class="pa-btn pa-unban" data-unban="' +
+            esc(b.address || "") +
+            '">unban</button>' +
+            "</div>",
+        )
+        .join("") +
+      "</div>";
 
-    rowsEl.innerHTML = bans
-      .map(
-        (b) =>
-          '<div class="ban-row">' +
-          '<span class="ban-row-addr">' +
-          esc(b.address || "") +
-          "</span>" +
-          '<span class="ban-row-exp">' +
-          utils.fmtBanLeft(b) +
-          "</span>" +
-          '<button type="button" class="pa-btn pa-unban" data-unban="' +
-          esc(b.address || "") +
-          '">unban</button>' +
-          "</div>",
-      )
-      .join("");
+    // Only touch the DOM if content actually changed — prevents scroll snap
+    if (html === this._lastHtml) return;
+    this._lastHtml = html;
+    rowsEl.innerHTML = html;
 
     if (!banList._unbanDelegated) {
       banList._unbanDelegated = true;
