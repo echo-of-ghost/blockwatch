@@ -109,9 +109,11 @@ const charts = {
       const xOf = (i) => pl + (i / (n - 1)) * plotW;
       const yOf = (s) => pt + (1 - s / maxSize) * plotH;
 
-      // Subtle horizontal grid lines
+      // Subtle horizontal grid lines with y-axis vByte labels
       ctx.setLineDash([2, 6]);
       ctx.lineWidth = 1;
+      ctx.font = "9px Geist Mono, monospace";
+      ctx.textAlign = "right";
       [0.25, 0.5, 0.75].forEach((level) => {
         const y = pt + (1 - level) * plotH;
         ctx.strokeStyle = `rgba(${rgb},0.07)`;
@@ -119,6 +121,10 @@ const charts = {
         ctx.moveTo(pl, y);
         ctx.lineTo(W - pr, y);
         ctx.stroke();
+        const labelVal = maxSize * level;
+        const labelTxt = labelVal > 1e6 ? (labelVal / 1e6).toFixed(1) + "M" : labelVal > 1e3 ? (labelVal / 1e3).toFixed(0) + "K" : labelVal.toFixed(0);
+        ctx.fillStyle = `rgba(${rgb},0.28)`;
+        ctx.fillText(labelTxt, W - pr - 2, y - 2);
       });
       ctx.setLineDash([]);
 
@@ -239,6 +245,7 @@ const charts = {
       }
 
       const accentRgb = getAccentRgb();
+      const amberRgb = (getComputedStyle(document.documentElement).getPropertyValue("--amber-rgb") || "230,160,40").trim();
 
       const gaps = [];
       for (let i = 0; i < blocks.length - 1; i++) {
@@ -294,8 +301,8 @@ const charts = {
             barGrad.addColorStop(0, "rgba(90,170,106,.75)");
             barGrad.addColorStop(1, "rgba(90,170,106,.35)");
           } else if (slow) {
-            barGrad.addColorStop(0, "rgba(64,64,64,.6)");
-            barGrad.addColorStop(1, "rgba(40,40,40,.4)");
+            barGrad.addColorStop(0, `rgba(${amberRgb},.55)`);
+            barGrad.addColorStop(1, `rgba(${amberRgb},.22)`);
           } else {
             barGrad.addColorStop(0, `rgba(${accentRgb},0.65)`);
             barGrad.addColorStop(1, `rgba(${accentRgb},0.30)`);

@@ -17,6 +17,7 @@ const nodePanel = {
   _avgBlockSecs: 600,
   _epochTooltipWired: false,
   _retargetState: { blocksLeft: 0, pctChange: 0 },
+  _seenForkHashes: new Set(),
 
   get currentChain() {
     return this._currentChain;
@@ -38,7 +39,7 @@ const nodePanel = {
 
     this._renderTitlebar(bc, ni, d.uptime, blocks, d);
     this._renderNodeInfo(bc, ni, d.rpcNode, blocks, now);
-    this._renderChainTips(d.chainTips || []);
+    this._renderChainTips(d.chainTips || [], bc.blocks || 0);
     this._renderRetarget(bc.blocks || 0, bc.mediantime || 0, cts);
     this._renderConsensus(bc, cts);
     this._renderStorage(bc);
@@ -168,7 +169,7 @@ const nodePanel = {
     setDisplay("sync-section", bc.initialblockdownload);
   },
 
-  _renderChainTips(tips) {
+  _renderChainTips(tips, currentHeight) {
     const tipsEl = $("ni-tips");
     if (!tipsEl) return;
 
@@ -180,19 +181,41 @@ const nodePanel = {
       return;
     }
 
+    const DISPLAY_WINDOW = 144; // ~1 day; beyond this a fork is resolved history
+    const TOAST_WINDOW = 6;     // within 6 blocks = just happened
+
     const active = tips.filter((t) => t.status === "active").length;
-    const deepForks = tips.filter(
+
+    // All deep forks for toast purposes (unfiltered by age)
+    const allDeepForks = tips.filter(
       (t) => t.status === "valid-fork" && t.branchlen > 1,
     );
+
+    // Toast only for forks within the last 6 blocks, once per hash
+    allDeepForks.forEach((t) => {
+      if (!t.hash) return;
+      if (currentHeight && t.height && (currentHeight - t.height) > TOAST_WINDOW) return;
+      if (!this._seenForkHashes.has(t.hash)) {
+        this._seenForkHashes.add(t.hash);
+        toastStack.add("valid-fork detected — " + t.branchlen + " blocks deep", "warn");
+      }
+    });
+
+    // Display: only forks within the last 144 blocks, sorted newest first, top 2
+    const recentDeepForks = allDeepForks
+      .filter((t) => !currentHeight || !t.height || (currentHeight - t.height) <= DISPLAY_WINDOW)
+      .sort((a, b) => (b.height || 0) - (a.height || 0))
+      .slice(0, 2);
+
     const orphans = tips.filter(
       (t) => t.status === "valid-fork" && t.branchlen === 1,
     );
     const validHdr = tips.filter((t) => t.status === "valid-headers");
     const invalid = tips.filter((t) => t.status === "invalid");
 
-    if (deepForks.length) {
+    if (recentDeepForks.length) {
       tipsEl.textContent =
-        deepForks.length + " fork" + (deepForks.length > 1 ? "s" : "");
+        recentDeepForks.length + " fork" + (recentDeepForks.length > 1 ? "s" : "");
       tipsEl.className = "v neg";
     } else if (invalid.length) {
       tipsEl.textContent = invalid.length + " invalid";
@@ -209,7 +232,7 @@ const nodePanel = {
       tipsEl.className = "v dim";
     }
 
-    const nonActive = [...deepForks, ...invalid, ...validHdr, ...orphans];
+    const nonActive = [...recentDeepForks, ...invalid, ...validHdr, ...orphans];
     let tipListEl = $("ni-tips-list");
     if (!tipListEl) {
       tipListEl = document.createElement("div");
@@ -223,7 +246,7 @@ const nodePanel = {
       return;
     }
 
-    const MAX_TIPS = 4;
+    const MAX_TIPS = 2;
     const visible = nonActive.slice(0, MAX_TIPS);
     const overflow = nonActive.length - visible.length;
 

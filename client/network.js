@@ -414,6 +414,7 @@ const poller = {
       blocksPanel._selectedHeight = null;
       blocksPanel._seenHeights = new Set();
       peersPanel._selectedId = null;
+      nodePanel._seenForkHashes = new Set();
     }
     this._lastChain = incomingChain;
 
