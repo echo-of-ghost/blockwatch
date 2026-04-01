@@ -58,9 +58,9 @@ const layout = {
       { name: "services", hf: 0.16 },
     ],
     [
-      { name: "chain", hf: 0.405 },
-      { name: "mempool-viz", hf: 0.31 },
-      { name: "block-timing", hf: 0.285 },
+      { name: "chain",        hf: 0.22 },
+      { name: "mempool-viz",  hf: 0.46 },
+      { name: "block-timing", hf: 0.32 },
     ],
     [
       { name: "blocks", hf: 0.25 },
@@ -73,7 +73,7 @@ const layout = {
     ],
   ],
 
-  _LS_KEY: "bw_layout_v43",
+  _LS_KEY: "bw_layout_v44",
 
   // ── Geometry helpers ─────────────────────────────────────────────────────────
 

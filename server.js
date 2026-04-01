@@ -612,15 +612,17 @@ function normalizeBlock(hash, hdr, st) {
 
 // conf_target values are included so the client label always matches what was
 // requested. If you change the targets here, the client labels update automatically.
-function normalizeFees(fast, med, slow, eco) {
+function normalizeFees(fast, fast3, med, slow, eco) {
   return {
-    fast: fast?.feerate ? Math.round(fast.feerate * 1e5) : null,
+    fast:       fast?.feerate  ? Math.round(fast.feerate  * 1e5) : null,
     fast_target: 1,
-    med: med?.feerate ? Math.round(med.feerate * 1e5) : null,
+    fast3:      fast3?.feerate ? Math.round(fast3.feerate * 1e5) : null,
+    fast3_target: 3,
+    med:        med?.feerate   ? Math.round(med.feerate   * 1e5) : null,
     med_target: 6,
-    slow: slow?.feerate ? Math.round(slow.feerate * 1e5) : null,
+    slow:       slow?.feerate  ? Math.round(slow.feerate  * 1e5) : null,
     slow_target: 144,
-    eco: eco?.feerate ? Math.round(eco.feerate * 1e5) : null,
+    eco:        eco?.feerate   ? Math.round(eco.feerate   * 1e5) : null,
     eco_target: 1008,
   };
 }
@@ -669,10 +671,11 @@ async function initState() {
       safe("getchaintips"),
     ]);
 
-  const [feeFast, feeMed, feeSlow, feeEco] = ibd
-    ? [null, null, null, null]
+  const [feeFast, feeFast3, feeMed, feeSlow, feeEco] = ibd
+    ? [null, null, null, null, null]
     : await Promise.all([
         safe("estimatesmartfee", [1]),
+        safe("estimatesmartfee", [3]),
         safe("estimatesmartfee", [6]),
         safe("estimatesmartfee", [144]),
         safe("estimatesmartfee", [1008]),
@@ -715,7 +718,7 @@ async function initState() {
     peers: Array.isArray(peerInfo) ? peerInfo : [],
     blocks,
     chainTxStats: chainTxStats || {},
-    fees: normalizeFees(feeFast, feeMed, feeSlow, feeEco),
+    fees: normalizeFees(feeFast, feeFast3, feeMed, feeSlow, feeEco),
     netTotals: netTotals || {},
     uptime: uptime || 0,
     deploymentInfo: deploymentInfo || {},
@@ -945,6 +948,7 @@ function startSparseRefresh() {
         ? []
         : [
             safe("estimatesmartfee", [1]),
+            safe("estimatesmartfee", [3]),
             safe("estimatesmartfee", [6]),
             safe("estimatesmartfee", [144]),
             safe("estimatesmartfee", [1008]),
@@ -965,7 +969,7 @@ function startSparseRefresh() {
       }
       if (tips) _state.chainTips = tips;
       if (uptime != null) _state.uptime = uptime;
-      if (!ibd && feeResults.length === 4)
+      if (!ibd && feeResults.length === 5)
         _state.fees = normalizeFees(...feeResults);
       if (!peers && !ni && !tips && uptime == null) return;
       _state.ts = Date.now();
