@@ -96,6 +96,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') contextMenu.
 // Terminal drawer — Electron only (body.electron set by preload)
 if (window.terminal) {
   terminalDrawer.init();
+  contextMenu.initGlobal();
   // Primary: globalShortcut in main relays via IPC → preload → document CustomEvent
   document.addEventListener('terminal:toggle', () => terminalDrawer.toggle());
   // Fallback: direct keydown

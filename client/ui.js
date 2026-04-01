@@ -1149,6 +1149,21 @@ const contextMenu = {
     const el = this._getEl();
     if (el) el.style.display = "none";
   },
+
+  initGlobal() {
+    if (!window.terminal) return;
+    document.addEventListener("contextmenu", (e) => {
+      if (e.target.closest(".ph")) return; // panel header has its own handler
+      e.preventDefault();
+      const el = this._getEl();
+      if (!el) return;
+      this._panel = null;
+      el.innerHTML = `<div class="ctx-item" data-action="terminal"><span class="ctx-icon">›</span>open terminal</div>`;
+      el.style.display = "block";
+      el.style.left = Math.min(e.clientX + 2, window.innerWidth - el.offsetWidth - 6) + "px";
+      el.style.top = Math.min(e.clientY + 2, window.innerHeight - el.offsetHeight - 6) + "px";
+    });
+  },
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
