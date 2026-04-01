@@ -11,7 +11,7 @@ Uses Bitcoin Core's native ZMQ for real-time block notifications (14x fewer RPC 
 ## Features
 
 - **Chain** — height, headers, sync progress, difficulty, hashrate, chainwork, chain tips / orphan detection
-- **Blocks** — last 12 blocks (8 during IBD) with height, hash, tx count, size, weight, age — hashes link to mempool.space (or your own instance)
+- **Blocks** — last 16 blocks (8 during IBD) with height, hash, tx count, size, weight, age — hashes link to mempool.space (or your own instance)
 - **Block detail** — per-block breakdown: fees, subsidy, era, fill %, feerate, miner version bits
 - **Fee / subsidy** — sparkline of fee revenue as a % of total block reward across recent blocks
 - **Block timing** — bar chart of inter-block intervals, reveals mining rhythm

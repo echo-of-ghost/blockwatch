@@ -1111,6 +1111,8 @@ const contextMenu = {
           if (item.dataset.action === "toggle") {
             const isMin = layout._minimized.has(this._panel);
             isMin ? layout.restore(this._panel) : layout.minimize(this._panel);
+          } else if (item.dataset.action === "terminal") {
+            terminalDrawer.show();
           } else if (item.dataset.action === "reset") {
             layout._reset();
           }
@@ -1127,10 +1129,14 @@ const contextMenu = {
 
     this._panel = panel;
     const isMin = layout._minimized.has(panel);
+    const terminalItem = window.terminal
+      ? `<div class="ctx-sep"></div><div class="ctx-item" data-action="terminal"><span class="ctx-icon">›</span>open terminal</div>`
+      : "";
     el.innerHTML = `
       <div class="ctx-item" data-action="toggle"><span class="ctx-icon">${isMin ? "&#9672;" : "&#9634;"}</span>${isMin ? "show panel" : "hide panel"}</div>
+      ${terminalItem}
       <div class="ctx-sep"></div>
-      <div class="ctx-item" data-action="reset"><span class="ctx-icon">&#8635;</span>reset layout</div>`;
+      <div class="ctx-item danger" data-action="reset"><span class="ctx-icon">&#8635;</span>reset layout</div>`;
 
     el.style.display = "block";
     const mw = el.offsetWidth,

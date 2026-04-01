@@ -155,6 +155,7 @@ $('blk-body')?.addEventListener('keydown', e => {
 $('conn-retry')?.addEventListener('click', () => poller.retryNow());
 $('la-reveal-btn')?.addEventListener('click', () => nodePanel.toggleLocalAddrs());
 $('peers-tsv-btn')?.addEventListener('click', () => peersPanel.exportTSV());
+$('blocks-tsv-btn')?.addEventListener('click', () => blocksPanel.exportTSV());
 $('snapshot-btn')?.addEventListener('click', () => poller.exportJSON());
 
 // Reset layout button
@@ -191,20 +192,8 @@ $('reset-layout-btn')?.addEventListener('click', () => {
 banList.refresh();
 setInterval(() => banList.refresh(), 60000);
 
-// Clock + staleness indicator — every second
+// Staleness indicator — every second
 setInterval(() => {
-  const now = new Date();
-  const iso = now.toISOString(); // e.g. "2026-03-25T14:32:07.000Z"
-  const dateStr = iso.slice(0, 10);           // "2026-03-25"
-  const hhmm    = iso.slice(11, 16);           // "14:32"
-  const secs    = ':' + iso.slice(17, 19);     // ":07"
-  const clockEl = $('clock');
-  if (clockEl) {
-    clockEl.innerHTML =
-      '<span class="clock-date">' + dateStr + ' </span>' +
-      hhmm +
-      '<span class="clock-secs">' + secs + '</span>';
-  }
   mobileBar.tickClock();
 
   const stale = $('sb-stale');

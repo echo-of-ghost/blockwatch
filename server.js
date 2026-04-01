@@ -635,7 +635,7 @@ async function initState() {
       ]);
 
   const tipHeight = blockchain.blocks;
-  const count = Math.min(ibd ? 8 : 12, tipHeight + 1);
+  const count = Math.min(ibd ? 8 : 16, tipHeight + 1);
   const heights = Array.from({ length: count }, (_, i) => tipHeight - i).filter(
     (h) => h >= 0,
   );
@@ -736,7 +736,7 @@ async function onNewBlock() {
     }
 
     const newBlock = normalizeBlock(blockHash, hdr, st);
-    const maxBlocks = ibd ? 8 : 12;
+    const maxBlocks = ibd ? 8 : 16;
 
     _state.blockchain = bc;
     _state.blocks = [newBlock, ..._state.blocks].slice(0, maxBlocks);

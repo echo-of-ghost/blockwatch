@@ -44,10 +44,6 @@
               <div class="rb-inner" id="rb-chips"></div>
             </div>
             <span class="tb-sep rb-sep">·</span>
-            <span class="tb-clock-wrap"
-              ><span id="clock">—</span><span class="tb-utc">UTC</span></span
-            >
-            <span class="tb-sep">·</span>
 
             <button
               type="button"
@@ -354,7 +350,7 @@
               <circle cx="4.5" cy="8.5" r="1" fill="currentColor" /></svg
             ><span class="ph-title">block timing</span
             ><span class="ph-sep">|</span
-            ><span class="ph-meta" id="bt-ph">last 12</span>
+            ><span class="ph-meta" id="bt-ph">last 16</span>
           </div>
           <div class="pb pb-chart">
             <canvas id="bt-canvas" style="width: 100%; display: block"></canvas>
@@ -382,7 +378,15 @@
               <circle cx="1.5" cy="8.5" r="1" fill="currentColor" />
               <circle cx="4.5" cy="8.5" r="1" fill="currentColor" /></svg
             ><span class="ph-title">blocks</span><span class="ph-sep">|</span
-            ><span class="ph-meta" id="blk-ph">—</span>
+            ><span class="ph-meta" id="blk-ph">—</span
+            ><span class="ph-right"
+              ><button
+                type="button"
+                id="blocks-tsv-btn"
+                class="ph-tsv-btn"
+                aria-label="Export blocks as TSV"
+              >blocks ↓</button></span
+            >
           </div>
           <div class="scroll-area">
             <table class="tbl" aria-label="Recent blocks">
@@ -447,7 +451,7 @@
               <div class="mn-hdr-sub">hashrate · <span id="mn-df">—</span> diff</div>
             </div>
             <div class="kv">
-              <span class="k dim">chainwork</span
+              <span class="k">chainwork</span
               ><span class="v mono v-copyable"
                 ><span id="mn-cw">—</span
                 ><span id="mn-cw-copy" data-copy="" class="copy-icon"

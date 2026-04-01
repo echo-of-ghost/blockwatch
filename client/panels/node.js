@@ -51,7 +51,7 @@ const nodePanel = {
     }
   },
 
-  _renderTitlebar(bc, ni, uptime, blocks, d = {}) {
+  _renderTitlebar(bc, ni, uptime, _blocks, d = {}) {
     const synced = (bc.verificationprogress || 0) >= 0.9995;
 
     setText("tb-ver", (ni.subversion || "").replace(/^\/|\/$/g, ""));
@@ -239,10 +239,12 @@ const nodePanel = {
       t.status === "invalid"
         ? "failed"
         : t.status === "valid-fork" && t.branchlen > 1
-          ? "failed"
-          : t.status === "valid-headers"
-            ? "locked"
-            : "defined";
+          ? "signal"
+          : t.status === "valid-fork"
+            ? "defined"
+            : t.status === "valid-headers"
+              ? "locked"
+              : "defined";
 
     tipListEl.innerHTML =
       `<div class="tip-list">` +
