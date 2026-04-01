@@ -21,7 +21,10 @@ function renderAll(d) {
 
   safeRender('hero',    () => heroStrip.render(d));
   safeRender('node',    () => nodePanel.render(d));
-  safeRender('chain',   () => chainPanel.render(d));
+  // Chain tip age — inline, chainPanel module removed
+  const _blocks = d.blocks || [];
+  const _now = Date.now() / 1000;
+  setText("ch-tip-age", _blocks.length && _blocks[0].time ? utils.fmtAgeAgo(_now - _blocks[0].time) : "—");
   safeRender('mempool', () => mempoolPanel.render(d));
   safeRender('network', () => network.render(d.netIn, d.netOut, d.totalRecv, d.totalSent));
   safeRender('peers',   () => peersPanel.render(d));
@@ -176,11 +179,6 @@ $('peers-tsv-btn')?.addEventListener('click', () => peersPanel.exportTSV());
 $('blocks-tsv-btn')?.addEventListener('click', () => blocksPanel.exportTSV());
 $('snapshot-btn')?.addEventListener('click', () => poller.exportJSON());
 
-// Reset layout button
-$('reset-layout-btn')?.addEventListener('click', () => {
-  layout._reset();
-});
-
 // Peer filter
 (function initPeerFilter() {
   const input = $('peer-filter');
@@ -213,6 +211,15 @@ setInterval(() => banList.refresh(), 60000);
 // Staleness indicator — every second
 setInterval(() => {
   mobileBar.tickClock();
+
+  // Tick tip age elements every second so they stay live between SSE events
+  const _tipTime = poller._lastData?.blocks?.[0]?.time;
+  if (_tipTime) {
+    const _tipAge = utils.fmtAgeAgo(Date.now() / 1000 - _tipTime);
+    setText('ch-tip-age', _tipAge);
+    const _heroAge = $('hero-tip-age');
+    if (_heroAge) _heroAge.textContent = _tipAge;
+  }
 
   const stale = $('sb-stale');
   if (!stale) return;

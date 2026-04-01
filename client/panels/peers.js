@@ -398,9 +398,9 @@ const peersPanel = {
     const pingMs = p.pingtime > 0 ? Math.round(p.pingtime * 1000) : null;
     set("ping", pingMs != null ? pingMs + "ms" : "—");
     set("conntime", p.conntime ? utils.fmtAge(now - p.conntime) : "—");
-    set("synced-headers", p.synced_headers > 0 ? fb(p.synced_headers) : "—");
-    set("synced-blocks", p.synced_blocks > 0 ? fb(p.synced_blocks) : "—");
-    set("hdr-blk-gap", fb((p.synced_headers || 0) - (p.synced_blocks || 0)));
+    set("synced-headers", p.synced_headers != null && p.synced_headers > 0 ? fb(p.synced_headers) : "—");
+    set("synced-blocks", p.synced_blocks != null && p.synced_blocks > 0 ? fb(p.synced_blocks) : "—");
+    set("hdr-blk-gap", fb((p.synced_headers ?? 0) - (p.synced_blocks ?? 0)));
     set("bw-sent", "↑ " + utils.fmtBytes(p.bytessent || 0));
     set("bw-recv", "↓ " + utils.fmtBytes(p.bytesrecv || 0));
     // update split bar widths

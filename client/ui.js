@@ -1228,7 +1228,6 @@ const mobileBar = {
 const heroStrip = {
   _lastHeight: null,
   _soundOn: false,
-  _audioSrc: null, // null = untested, true = file found, false = use synth
 
   _setVal(id, val, primary = false) {
     const el = $(id);
@@ -1302,9 +1301,7 @@ const heroStrip = {
   _initSound() {
     const btn = $("sound-btn");
     if (!btn) return;
-    try {
-      this._soundOn = localStorage.getItem("bw-sound") === "1";
-    } catch (_) {}
+    try { this._soundOn = localStorage.getItem("bw-sound") === "1"; } catch (_) {}
     btn.classList.toggle("sound-on", this._soundOn);
     btn.addEventListener("click", () => {
       this._soundOn = !this._soundOn;
@@ -1315,51 +1312,7 @@ const heroStrip = {
 
   _playBlockTick() {
     if (!this._soundOn) return;
-    // Prefer a bundled asset if present (drop block.mp3, block.ogg, or block.wav in assets/)
-    if (this._audioSrc !== false) {
-      const src = this._audioSrc || "/assets/block.mp3";
-      try {
-        const a = new Audio(src);
-        a.volume = 0.5;
-        const p = a.play();
-        if (p) {
-          p.then(() => { this._audioSrc = src; }).catch(() => {
-            // Try next extension or fall through to synth
-            if (src.endsWith(".mp3")) {
-              this._audioSrc = "/assets/block.ogg";
-              this._playBlockTick();
-            } else if (src.endsWith(".ogg")) {
-              this._audioSrc = "/assets/block.wav";
-              this._playBlockTick();
-            } else {
-              this._audioSrc = false;
-              this._synthTick();
-            }
-          });
-        }
-        return;
-      } catch (_) {
-        this._audioSrc = false;
-      }
-    }
-    this._synthTick();
+    new Audio("/assets/block.ogg").play().catch(() => {});
   },
 
-  _synthTick() {
-    try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(880, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.08);
-      gain.gain.setValueAtTime(0.18, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.18);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.18);
-      osc.onended = () => ctx.close();
-    } catch (_) {}
-  },
 };

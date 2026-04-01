@@ -612,18 +612,10 @@ function normalizeBlock(hash, hdr, st) {
 
 // conf_target values are included so the client label always matches what was
 // requested. If you change the targets here, the client labels update automatically.
-function normalizeFees(fast, fast3, med, slow, eco) {
+function normalizeFees(fast) {
   return {
-    fast:       fast?.feerate  ? Math.round(fast.feerate  * 1e5) : null,
+    fast: fast?.feerate ? Math.round(fast.feerate * 1e5) : null,
     fast_target: 1,
-    fast3:      fast3?.feerate ? Math.round(fast3.feerate * 1e5) : null,
-    fast3_target: 3,
-    med:        med?.feerate   ? Math.round(med.feerate   * 1e5) : null,
-    med_target: 6,
-    slow:       slow?.feerate  ? Math.round(slow.feerate  * 1e5) : null,
-    slow_target: 144,
-    eco:        eco?.feerate   ? Math.round(eco.feerate   * 1e5) : null,
-    eco_target: 1008,
   };
 }
 
@@ -671,15 +663,7 @@ async function initState() {
       safe("getchaintips"),
     ]);
 
-  const [feeFast, feeFast3, feeMed, feeSlow, feeEco] = ibd
-    ? [null, null, null, null, null]
-    : await Promise.all([
-        safe("estimatesmartfee", [1]),
-        safe("estimatesmartfee", [3]),
-        safe("estimatesmartfee", [6]),
-        safe("estimatesmartfee", [144]),
-        safe("estimatesmartfee", [1008]),
-      ]);
+  const feeFast = ibd ? null : await safe("estimatesmartfee", [1]);
 
   const tipHeight = blockchain.blocks;
   const count = Math.min(ibd ? 8 : 24, tipHeight + 1);
@@ -718,7 +702,7 @@ async function initState() {
     peers: Array.isArray(peerInfo) ? peerInfo : [],
     blocks,
     chainTxStats: chainTxStats || {},
-    fees: normalizeFees(feeFast, feeFast3, feeMed, feeSlow, feeEco),
+    fees: normalizeFees(feeFast),
     netTotals: netTotals || {},
     uptime: uptime || 0,
     deploymentInfo: deploymentInfo || {},
@@ -944,19 +928,8 @@ function startSparseRefresh() {
         safe("getchaintips"),
         safe("uptime"),
       ];
-      const feeReqs = ibd
-        ? []
-        : [
-            safe("estimatesmartfee", [1]),
-            safe("estimatesmartfee", [3]),
-            safe("estimatesmartfee", [6]),
-            safe("estimatesmartfee", [144]),
-            safe("estimatesmartfee", [1008]),
-          ];
-
-      const results = await Promise.all([...base, ...feeReqs]);
+      const results = await Promise.all(base);
       const [peers, ni, tips, uptime] = results;
-      const feeResults = results.slice(4);
 
       if (peers) _state.peers = peers;
       if (ni) {
@@ -969,8 +942,10 @@ function startSparseRefresh() {
       }
       if (tips) _state.chainTips = tips;
       if (uptime != null) _state.uptime = uptime;
-      if (!ibd && feeResults.length === 5)
-        _state.fees = normalizeFees(...feeResults);
+      if (!ibd) {
+        const feeFast = await safe("estimatesmartfee", [1]);
+        _state.fees = normalizeFees(feeFast);
+      }
       if (!peers && !ni && !tips && uptime == null) return;
       _state.ts = Date.now();
       broadcast();
