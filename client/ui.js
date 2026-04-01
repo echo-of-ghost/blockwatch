@@ -1233,6 +1233,8 @@ const mobileBar = {
 // HERO STRIP — block height · next-block fee · mempool · peers
 // ═══════════════════════════════════════════════════════════════════════════════
 const heroStrip = {
+  _lastHeight: null,
+
   _setVal(id, val) {
     const el = $(id);
     if (!el) return;
@@ -1244,6 +1246,14 @@ const heroStrip = {
     el.classList.add("hero-flash");
   },
 
+  _pulseHeightBar() {
+    const cell = $("hero-height")?.closest(".hero-cell");
+    if (!cell) return;
+    cell.classList.remove("hero-cell-new-block");
+    void cell.offsetWidth;
+    cell.classList.add("hero-cell-new-block");
+  },
+
   render(d) {
     const bc = d.blockchain || {};
     const ni = d.networkInfo || {};
@@ -1252,7 +1262,12 @@ const heroStrip = {
     const blocks = d.blocks || [];
     const now = Date.now() / 1000;
 
-    this._setVal("hero-height", fb(bc.blocks || 0));
+    const newHeight = bc.blocks || 0;
+    if (this._lastHeight !== null && newHeight > this._lastHeight) {
+      this._pulseHeightBar();
+    }
+    this._lastHeight = newHeight;
+    this._setVal("hero-height", fb(newHeight));
 
     const tipTime = blocks.length ? blocks[0].time : 0;
     const ageEl = $("hero-tip-age");
