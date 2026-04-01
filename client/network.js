@@ -271,7 +271,7 @@ const network = {
     if (!c || c._bwHoverWired) return;
     c._bwHoverWired = true;
 
-    const { PAD_L, PAD_R, PAD_T, PAD_B, CHART_H } = this;
+    const { PAD_L, PAD_R } = this;
 
     const idxAt = (clientX) => {
       const rect = c.getBoundingClientRect();
@@ -414,7 +414,6 @@ const poller = {
       blocksPanel._selectedHeight = null;
       blocksPanel._seenHeights = new Set();
       peersPanel._selectedId = null;
-      nodePanel._seenForkHashes = new Set();
     }
     this._lastChain = incomingChain;
 

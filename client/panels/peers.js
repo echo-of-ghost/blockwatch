@@ -321,11 +321,11 @@ const peersPanel = {
           <span class="pd-stat-lbl">protocol</span>
         </div>
         <div class="pd-stat-cell">
-          <span class="pd-stat-val dim" data-pd="synced-headers">${p.synced_headers ? fb(p.synced_headers) : "—"}</span>
+          <span class="pd-stat-val dim" data-pd="synced-headers">${p.synced_headers > 0 ? fb(p.synced_headers) : "—"}</span>
           <span class="pd-stat-lbl">headers</span>
         </div>
         <div class="pd-stat-cell">
-          <span class="pd-stat-val dim" data-pd="synced-blocks">${p.synced_blocks ? fb(p.synced_blocks) : "—"}</span>
+          <span class="pd-stat-val dim" data-pd="synced-blocks">${p.synced_blocks > 0 ? fb(p.synced_blocks) : "—"}</span>
           <span class="pd-stat-lbl">blocks</span>
         </div>
         <div class="pd-stat-cell">
@@ -398,8 +398,8 @@ const peersPanel = {
     const pingMs = p.pingtime > 0 ? Math.round(p.pingtime * 1000) : null;
     set("ping", pingMs != null ? pingMs + "ms" : "—");
     set("conntime", p.conntime ? utils.fmtAge(now - p.conntime) : "—");
-    set("synced-headers", p.synced_headers ? fb(p.synced_headers) : "—");
-    set("synced-blocks", p.synced_blocks ? fb(p.synced_blocks) : "—");
+    set("synced-headers", p.synced_headers > 0 ? fb(p.synced_headers) : "—");
+    set("synced-blocks", p.synced_blocks > 0 ? fb(p.synced_blocks) : "—");
     set("hdr-blk-gap", fb((p.synced_headers || 0) - (p.synced_blocks || 0)));
     set("bw-sent", "↑ " + utils.fmtBytes(p.bytessent || 0));
     set("bw-recv", "↓ " + utils.fmtBytes(p.bytesrecv || 0));

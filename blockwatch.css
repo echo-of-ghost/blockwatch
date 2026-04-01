@@ -1571,6 +1571,7 @@ a.ext-link:hover { color: var(--orange); }
   font-family: var(--sans);
 }
 .bd-pctile-mid-lbl { color: var(--orange); }
+.bd-pctile-key { color: var(--t4); margin-right: 2px; }
 
 /* ── Compact KV rows for reward + technical ── */
 .bd-kv {

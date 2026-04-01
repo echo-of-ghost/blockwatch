@@ -168,11 +168,11 @@ const blocksPanel = {
         <div class="bd-section-label">fee distribution (sat/vB)</div>
         <div class="bd-pctile-chart">${bars}</div>
         <div class="bd-pctile-labels">
-          <span>p10:${esc(fmt(vals[0]))}</span>
-          <span>p25:${esc(fmt(vals[1]))}</span>
-          <span class="bd-pctile-mid-lbl">p50:${esc(fmt(vals[2]))}</span>
-          <span>p75:${esc(fmt(vals[3]))}</span>
-          <span>p90:${esc(fmt(vals[4]))}</span>
+          <span><span class="bd-pctile-key">p10</span>${esc(fmt(vals[0]))}</span>
+          <span><span class="bd-pctile-key">p25</span>${esc(fmt(vals[1]))}</span>
+          <span class="bd-pctile-mid-lbl"><span class="bd-pctile-key">p50</span>${esc(fmt(vals[2]))}</span>
+          <span><span class="bd-pctile-key">p75</span>${esc(fmt(vals[3]))}</span>
+          <span><span class="bd-pctile-key">p90</span>${esc(fmt(vals[4]))}</span>
         </div>`;
     })();
 

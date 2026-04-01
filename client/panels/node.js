@@ -17,7 +17,6 @@ const nodePanel = {
   _avgBlockSecs: 600,
   _epochTooltipWired: false,
   _retargetState: { blocksLeft: 0, pctChange: 0 },
-  _seenForkHashes: new Set(),
 
   get currentChain() {
     return this._currentChain;
@@ -181,41 +180,27 @@ const nodePanel = {
       return;
     }
 
-    const DISPLAY_WINDOW = 144; // ~1 day; beyond this a fork is resolved history
-    const TOAST_WINDOW = 6;     // within 6 blocks = just happened
+    const DISPLAY_WINDOW = 144; // expire forks older than ~1 day
 
     const active = tips.filter((t) => t.status === "active").length;
 
-    // All deep forks for toast purposes (unfiltered by age)
-    const allDeepForks = tips.filter(
-      (t) => t.status === "valid-fork" && t.branchlen > 1,
-    );
-
-    // Toast only for forks within the last 6 blocks, once per hash
-    allDeepForks.forEach((t) => {
-      if (!t.hash) return;
-      if (currentHeight && t.height && (currentHeight - t.height) > TOAST_WINDOW) return;
-      if (!this._seenForkHashes.has(t.hash)) {
-        this._seenForkHashes.add(t.hash);
-        toastStack.add("valid-fork detected — " + t.branchlen + " blocks deep", "warn");
-      }
-    });
-
-    // Display: only forks within the last 144 blocks, sorted newest first, top 2
-    const recentDeepForks = allDeepForks
+    // Display: all valid-forks within 144 blocks, sorted newest by height, top 2
+    const recentDeepForks = tips
+      .filter((t) => t.status === "valid-fork")
       .filter((t) => !currentHeight || !t.height || (currentHeight - t.height) <= DISPLAY_WINDOW)
       .sort((a, b) => (b.height || 0) - (a.height || 0))
       .slice(0, 2);
 
-    const orphans = tips.filter(
-      (t) => t.status === "valid-fork" && t.branchlen === 1,
-    );
     const validHdr = tips.filter((t) => t.status === "valid-headers");
     const invalid = tips.filter((t) => t.status === "invalid");
 
-    if (recentDeepForks.length) {
+    // Count orphans (branchlen === 1) only within the display window for the summary label
+    const recentOrphans = recentDeepForks.filter((t) => t.branchlen === 1);
+    const recentSignificant = recentDeepForks.filter((t) => t.branchlen > 1);
+
+    if (recentSignificant.length) {
       tipsEl.textContent =
-        recentDeepForks.length + " fork" + (recentDeepForks.length > 1 ? "s" : "");
+        recentSignificant.length + " fork" + (recentSignificant.length > 1 ? "s" : "");
       tipsEl.className = "v neg";
     } else if (invalid.length) {
       tipsEl.textContent = invalid.length + " invalid";
@@ -223,16 +208,16 @@ const nodePanel = {
     } else if (validHdr.length) {
       tipsEl.textContent = validHdr.length + " valid-headers";
       tipsEl.className = "v o";
-    } else if (orphans.length) {
+    } else if (recentOrphans.length) {
       tipsEl.textContent =
-        orphans.length + " orphan" + (orphans.length > 1 ? "s" : "");
+        recentOrphans.length + " orphan" + (recentOrphans.length > 1 ? "s" : "");
       tipsEl.className = "v dim";
     } else {
       tipsEl.textContent = active + " active";
       tipsEl.className = "v dim";
     }
 
-    const nonActive = [...recentDeepForks, ...invalid, ...validHdr, ...orphans];
+    const nonActive = [...recentDeepForks, ...invalid, ...validHdr];
     let tipListEl = $("ni-tips-list");
     if (!tipListEl) {
       tipListEl = document.createElement("div");
@@ -460,6 +445,35 @@ const nodePanel = {
     if (pruneRow) pruneRow.style.display = bc.pruned ? "" : "none";
     if (bc.pruned && bc.pruneheight != null)
       setText("ni-pruneheight", "#" + fb(bc.pruneheight));
+
+    if (!this._utxoBtnWired) {
+      this._utxoBtnWired = true;
+      const btn = $("ni-utxo-btn");
+      if (btn) btn.addEventListener("click", () => this._fetchUtxoSet());
+    }
+  },
+
+  _utxoBtnWired: false,
+
+  async _fetchUtxoSet() {
+    const btn = $("ni-utxo-btn");
+    const el = $("ni-utxo");
+    if (!el) return;
+    if (btn) { btn.disabled = true; btn.textContent = "scanning…"; }
+    try {
+      const res = await fetch("/api/rpc", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ method: "gettxoutsetinfo", params: [] }),
+      });
+      const j = await res.json();
+      if (j.error) throw new Error(j.error);
+      const r = j.result;
+      el.textContent = fb(r.txouts) + " utxos · " + utils.fmtBytes(r.disk_size || r.bogosize || 0);
+    } catch (e) {
+      if (btn) { btn.disabled = false; btn.textContent = "retry"; }
+      toastStack.add("gettxoutsetinfo: " + e.message);
+    }
   },
 
   _renderNetworkReachability(ni) {

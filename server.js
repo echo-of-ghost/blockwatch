@@ -1112,6 +1112,7 @@ const server = http.createServer(async (req, res) => {
           "disconnectnode",
           "setban",
           "listbanned",
+          "gettxoutsetinfo",
         ]);
         if (!ALLOWED_METHODS.has(method))
           throw new Error("method not allowed: " + method);
