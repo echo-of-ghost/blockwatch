@@ -1129,12 +1129,9 @@ const contextMenu = {
 
     this._panel = panel;
     const isMin = layout._minimized.has(panel);
-    const terminalItem = window.terminal
-      ? `<div class="ctx-sep"></div><div class="ctx-item" data-action="terminal"><span class="ctx-icon">›</span>open terminal</div>`
-      : "";
     el.innerHTML = `
       <div class="ctx-item" data-action="toggle"><span class="ctx-icon">${isMin ? "&#9672;" : "&#9634;"}</span>${isMin ? "show panel" : "hide panel"}</div>
-      ${terminalItem}
+      <div class="ctx-sep"></div><div class="ctx-item" data-action="terminal"><span class="ctx-icon">›</span>open terminal</div>
       <div class="ctx-sep"></div>
       <div class="ctx-item danger" data-action="reset"><span class="ctx-icon">&#8635;</span>reset layout</div>`;
 
@@ -1151,7 +1148,6 @@ const contextMenu = {
   },
 
   initGlobal() {
-    if (!window.terminal) return;
     document.addEventListener("contextmenu", (e) => {
       if (e.target.closest(".ph")) return; // panel header has its own handler
       e.preventDefault();
@@ -1234,16 +1230,18 @@ const mobileBar = {
 // ═══════════════════════════════════════════════════════════════════════════════
 const heroStrip = {
   _lastHeight: null,
+  _soundOn: false,
+  _audioSrc: null, // null = untested, true = file found, false = use synth
 
-  _setVal(id, val) {
+  _setVal(id, val, primary = false) {
     const el = $(id);
     if (!el) return;
     const s = String(val);
     if (el.textContent === s) return;
     el.textContent = s;
-    el.classList.remove("hero-flash");
-    void el.offsetWidth; // reflow to restart animation
-    el.classList.add("hero-flash");
+    el.classList.remove("hero-flash", "hero-flash-secondary");
+    void el.offsetWidth;
+    el.classList.add(primary ? "hero-flash" : "hero-flash-secondary");
   },
 
   _pulseHeightBar() {
@@ -1265,9 +1263,10 @@ const heroStrip = {
     const newHeight = bc.blocks || 0;
     if (this._lastHeight !== null && newHeight > this._lastHeight) {
       this._pulseHeightBar();
+      this._playBlockTick();
     }
     this._lastHeight = newHeight;
-    this._setVal("hero-height", fb(newHeight));
+    this._setVal("hero-height", fb(newHeight), true);
 
     const tipTime = blocks.length ? blocks[0].time : 0;
     const ageEl = $("hero-tip-age");
@@ -1295,5 +1294,75 @@ const heroStrip = {
       pSub.textContent =
         cin != null && cout != null ? cin + "↓  " + cout + "↑" : "—";
     }
+
+    // Panel header badges
+    const mpPh = $("mp-ph");
+    if (mpPh && mi.size != null) mpPh.textContent = fb(mi.size) + " txs";
+
+
+  },
+
+  _initSound() {
+    const btn = $("sound-btn");
+    if (!btn) return;
+    try {
+      this._soundOn = localStorage.getItem("bw-sound") === "1";
+    } catch (_) {}
+    btn.classList.toggle("sound-on", this._soundOn);
+    btn.addEventListener("click", () => {
+      this._soundOn = !this._soundOn;
+      btn.classList.toggle("sound-on", this._soundOn);
+      try { localStorage.setItem("bw-sound", this._soundOn ? "1" : "0"); } catch (_) {}
+    });
+  },
+
+  _playBlockTick() {
+    if (!this._soundOn) return;
+    // Prefer a bundled asset if present (drop block.mp3, block.ogg, or block.wav in assets/)
+    if (this._audioSrc !== false) {
+      const src = this._audioSrc || "/assets/block.mp3";
+      try {
+        const a = new Audio(src);
+        a.volume = 0.5;
+        const p = a.play();
+        if (p) {
+          p.then(() => { this._audioSrc = src; }).catch(() => {
+            // Try next extension or fall through to synth
+            if (src.endsWith(".mp3")) {
+              this._audioSrc = "/assets/block.ogg";
+              this._playBlockTick();
+            } else if (src.endsWith(".ogg")) {
+              this._audioSrc = "/assets/block.wav";
+              this._playBlockTick();
+            } else {
+              this._audioSrc = false;
+              this._synthTick();
+            }
+          });
+        }
+        return;
+      } catch (_) {
+        this._audioSrc = false;
+      }
+    }
+    this._synthTick();
+  },
+
+  _synthTick() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.08);
+      gain.gain.setValueAtTime(0.18, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.18);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.18);
+      osc.onended = () => ctx.close();
+    } catch (_) {}
   },
 };

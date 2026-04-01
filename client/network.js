@@ -10,8 +10,8 @@
 // NETWORK MODULE — bandwidth history + rich canvas chart
 // ═══════════════════════════════════════════════════════════════════════════════
 const network = {
-  _histSent: Array(120).fill(0),
-  _histRecv: Array(120).fill(0),
+  _histSent: Array(240).fill(0),
+  _histRecv: Array(240).fill(0),
   _mempoolHistory: Array(120).fill({ size: 0, txCount: 0 }),
   _hoverIdx: -1,
   _hoverRaf: null,
@@ -28,8 +28,8 @@ const network = {
   push(sentRate, recvRate) {
     this._histSent.push(sentRate);
     this._histRecv.push(recvRate);
-    if (this._histSent.length > 120) this._histSent.shift();
-    if (this._histRecv.length > 120) this._histRecv.shift();
+    if (this._histSent.length > 240) this._histSent.shift();
+    if (this._histRecv.length > 240) this._histRecv.shift();
   },
 
   pushMempool(size, txCount) {
@@ -113,7 +113,7 @@ const network = {
       ctx.fillText(utils.fmtRate(tick), PAD_L + 3, y - 3);
     });
 
-    // ── X-axis tick marks (every 10 samples = ~50s with 5s intervals) ─────
+    // ── X-axis tick marks (every 10 samples = ~50s) ──────────────────────────
     const xOf = (i) => PAD_L + (i / (N - 1)) * plotW;
     ctx.strokeStyle = "rgba(255,255,255,0.04)";
     ctx.lineWidth = 1;
@@ -125,13 +125,15 @@ const network = {
       ctx.stroke();
     }
 
-    // X-axis labels: "–Ns ago" at anchor points (120 samples × 5s = 10min)
+    // X-axis labels: "–Nm ago" at anchor points (240 samples × 5s = 20min)
     ctx.font = "10px Geist Mono, monospace";
     ctx.textAlign = "center";
     ctx.fillStyle = "rgba(64,64,64,0.9)";
     [
-      { i: 0, label: "10m" },
-      { i: Math.round(N * 0.5), label: "5m" },
+      { i: 0, label: "20m" },
+      { i: Math.round(N * 0.25), label: "15m" },
+      { i: Math.round(N * 0.5), label: "10m" },
+      { i: Math.round(N * 0.75), label: "5m" },
       { i: N - 1, label: "now" },
     ].forEach(({ i, label }) => {
       ctx.fillText(label, xOf(i), cssH - 3);

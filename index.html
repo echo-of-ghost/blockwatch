@@ -53,6 +53,13 @@
             >
               snapshot ↓
             </button>
+            <button
+              type="button"
+              id="sound-btn"
+              class="tb-sound-btn"
+              aria-label="Toggle new block sound"
+              title="Toggle new block sound"
+            >♪</button>
             <span
               class="dot"
               id="live-dot"
@@ -350,9 +357,10 @@
               <circle cx="4.5" cy="8.5" r="1" fill="currentColor" /></svg
             ><span class="ph-title">block timing</span
             ><span class="ph-sep">|</span
-            ><span class="ph-meta" id="bt-ph">last 16</span>
+            ><span class="ph-meta" id="bt-ph">last 24</span>
           </div>
-          <div class="pb pb-chart">
+          <div class="pb pb-chart" style="position:relative">
+            <div id="bt-hover"></div>
             <canvas id="bt-canvas" style="width: 100%; display: block"></canvas>
             <div class="chart-leg">
               <span class="chart-leg-min" id="bt-min">—</span

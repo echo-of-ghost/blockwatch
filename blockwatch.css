@@ -190,8 +190,10 @@ html, body { height: 100dvh; overflow: hidden; background: var(--void); color: v
 .hero-cell:first-child .hero-val { color: var(--t1); }
 .hero-foot { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 2px; }
 .hero-sub { font-size: var(--fs-xs); color: var(--t4); line-height: 1; white-space: nowrap; margin-left: auto; }
-@keyframes hero-update { 0%{ filter: brightness(2.5); } 100%{ filter: brightness(1); } }
-.hero-flash { animation: hero-update .5s ease; }
+@keyframes hero-update-primary   { 0%{ filter:brightness(2.2); } 100%{ filter:brightness(1); } }
+@keyframes hero-update-secondary  { 0%{ filter:brightness(1.6); } 100%{ filter:brightness(1); } }
+.hero-flash          { animation: hero-update-primary  .5s ease; }
+.hero-flash-secondary { animation: hero-update-secondary .35s ease; }
 @keyframes hero-bar-pulse {
   0%   { opacity: .9; box-shadow: 0 0 0 rgba(var(--orange-rgb),0); }
   30%  { opacity: 1;  box-shadow: 0 0 8px rgba(var(--orange-rgb),.9); }
@@ -884,6 +886,17 @@ a.ext-link:hover { color: var(--orange); }
 .snapshot-btn { background: var(--odim); border: none; color: var(--orange); font-size: var(--fs-xs); letter-spacing: .06em; font-family: var(--mono); padding: 2px 8px; border-radius: 2px; cursor: pointer; transition: background var(--t-std), color .15s, transform var(--t-fast); }
 .snapshot-btn:hover { background: var(--osoft); color: var(--orange); }
 .snapshot-btn:active { transform: scale(0.97); }
+
+/* ── Sound toggle ── */
+.tb-sound-btn { background: none; border: none; color: var(--t4); font-size: var(--fs-xs); cursor: pointer; padding: 0 4px; font-family: var(--mono); transition: color var(--t-fast); line-height: 1; }
+.tb-sound-btn:hover { color: var(--t2); }
+.tb-sound-btn.sound-on { color: var(--orange); }
+
+/* ── Block timing hover tip ── */
+#bt-hover { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--border); border-top: 2px solid var(--orange); border-radius: 3px; padding: 5px 8px; font-size: var(--fs-xs); font-family: var(--mono); color: var(--t2); white-space: nowrap; display: none; z-index: 40; box-shadow: 0 4px 12px rgba(0,0,0,.4); }
+#bt-hover.visible { display: block; }
+#bt-hover .bt-ht { color: var(--t4); font-size: 10px; }
+#bt-hover .bt-iv { color: var(--t1); font-weight: 500; }
 
 #fee-ridge-canvas { display: block; }
 #fs-canvas { display:block; }
@@ -1607,25 +1620,24 @@ a.ext-link:hover { color: var(--orange); }
 .bd-section-tech .bd-kv .v.dim { color: var(--t4); opacity: .7; }
 /* ══════════════════════════════════════════════════════════════════════════════
    ELECTRON — frameless window, drag region, traffic light spacing
-   Applied via body.electron added by electron/preload.js
    ══════════════════════════════════════════════════════════════════════════════ */
 
 /* Make the titlebar the drag handle for the window */
-body.electron #titlebar {
+#titlebar {
   -webkit-app-region: drag;
 }
 
 /* macOS only — leave room for native traffic light buttons */
-body.electron.platform-darwin #titlebar {
+body.platform-darwin #titlebar {
   padding-left: 80px;
 }
 
 /* Interactive elements inside the titlebar must opt out of dragging */
-body.electron #titlebar button,
-body.electron #titlebar a,
-body.electron #titlebar .dot,
-body.electron #titlebar #restore-bar,
-body.electron #titlebar [role="button"] {
+#titlebar button,
+#titlebar a,
+#titlebar .dot,
+#titlebar #restore-bar,
+#titlebar [role="button"] {
   -webkit-app-region: no-drag;
 }
 

@@ -2,10 +2,8 @@
 
 const { contextBridge, ipcRenderer } = require("electron");
 
-// Adds the `electron` class to <body> so CSS can apply drag regions.
-// document is shared between the isolated preload context and the page.
+// Adds platform class to <body> for platform-specific CSS (e.g. macOS traffic lights).
 document.addEventListener("DOMContentLoaded", () => {
-  document.body.classList.add("electron");
   document.body.classList.add("platform-" + process.platform);
 });
 
