@@ -286,6 +286,25 @@ const charts = {
       ctx.font = `${fontSize}px Geist Mono, monospace`;
       ctx.textAlign = "center";
 
+      // Subtle area fill — traces bar tops down to the chart floor
+      {
+        const areaGrad = ctx.createLinearGradient(0, 0, 0, H);
+        areaGrad.addColorStop(0, `rgba(${accentRgb},0.10)`);
+        areaGrad.addColorStop(1, `rgba(${accentRgb},0.01)`);
+        ctx.fillStyle = areaGrad;
+        ctx.beginPath();
+        ctx.moveTo(padX, H);
+        gaps.forEach(({ g }, i) => {
+          const barH = Math.max(2, Math.floor((g / maxG) * (H - 4)));
+          const x = padX + i * (bw + 1);
+          ctx.lineTo(x, H - barH);
+          ctx.lineTo(x + bw, H - barH);
+        });
+        ctx.lineTo(padX + (gaps.length - 1) * (bw + 1) + bw, H);
+        ctx.closePath();
+        ctx.fill();
+      }
+
       gaps.forEach(({ g, current }, i) => {
         const barH = Math.max(2, Math.floor((g / maxG) * (H - 4)));
         const x = padX + i * (bw + 1);
