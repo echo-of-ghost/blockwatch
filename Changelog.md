@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.1] - 2026-04-02
+
+### Fixed
+- **Panel drag highlight disappears after several swaps**: `_bringToFront` incremented `_zTop` unboundedly from 20. Once it exceeded 50 (the swap ghost's z-index), panels rendered on top of the highlight overlay making it invisible — the swap still worked but gave no visual feedback. Fixed by compacting all panel z-indexes back to the 11–19 range before `_zTop` approaches the ghost layer.
+- **Persistent dashed insert line after interrupted drag**: Orphaned `drop-ghost` / `drop-insert-line` elements left by a drag that lost its pointer event (e.g. window focus change) are now cleaned up at the start of every new drag.
+
 ## [2.2.0] - 2026-04-02
 
 ### Added
