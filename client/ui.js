@@ -387,6 +387,9 @@ const layout = {
       e.preventDefault();
       ph.setPointerCapture(e.pointerId);
 
+      // Clean up any orphaned ghosts left by a previous drag that lost its pointer event
+      this._main.querySelectorAll('.drop-ghost, .drop-insert-line').forEach(el => el.remove());
+
       const l0 = parseInt(panel.style.left) || 0;
       const t0 = parseInt(panel.style.top) || 0;
       const W = panel.offsetWidth;
@@ -966,6 +969,19 @@ const layout = {
   },
 
   _bringToFront(p) {
+    // Drop ghosts sit at z:50/51. If _zTop climbs past them panels cover the
+    // swap highlight. Compact all panel z-indexes back to the base range before
+    // that happens so ghosts are always visible during drag.
+    if (this._zTop >= 48) {
+      const panels = this._allPanels().filter(
+        q => !['titlebar','hero','statusbar'].includes(q.dataset.panel)
+      );
+      const sorted = [...panels].sort(
+        (a, b) => (parseInt(a.style.zIndex) || 10) - (parseInt(b.style.zIndex) || 10)
+      );
+      sorted.forEach((q, i) => { q.style.zIndex = 11 + i; });
+      this._zTop = 10 + panels.length;
+    }
     p.style.zIndex = ++this._zTop;
   },
 
