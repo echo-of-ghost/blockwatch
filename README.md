@@ -1,6 +1,6 @@
 # BLOCKWATCH
 
-A real-time Bitcoin node dashboard. Connects directly to your local Bitcoin Core node via RPC and displays live chain, mempool, peer, and network data in a clean, dense browser interface.
+A real-time Bitcoin node dashboard. Connects directly to your local Bitcoin Core node via RPC and displays live chain, mempool, peer, and network data in a clean, dense desktop interface.
 
 Uses Bitcoin Core's native ZMQ for real-time block notifications (14x fewer RPC calls) and falls back to polling if unavailable. No external APIs. Your node, your data.
 
@@ -14,19 +14,20 @@ Uses Bitcoin Core's native ZMQ for real-time block notifications (14x fewer RPC 
 - **Blocks** — last 16 blocks (8 during IBD) with height, hash, tx count, size, weight, age — hashes link to mempool.space (or your own instance)
 - **Block detail** — per-block breakdown: fees, subsidy, era, fill %, feerate, miner version bits
 - **Fee / subsidy** — sparkline of fee revenue as a % of total block reward across recent blocks
-- **Block timing** — bar chart of inter-block intervals, reveals mining rhythm
+- **Block timing** — bar chart of inter-block intervals with gradient area fill, reveals mining rhythm
 - **Block activity** — fee rate and total fee history across recent blocks
 - **Softforks** — live deployment status for all active and pending BIP9 forks (requires Bitcoin Core v24+)
 - **Mempool** — tx count, size, fee rates, usage meter, min relay fee, updated every 5s
-- **Fee estimates** — next block / 6 blocks / 1 day / economy, colour-coded by urgency; skipped during IBD
+- **Next block fee** — sat/vB estimate shown in the hero strip; skipped during IBD
 - **Peers** — inbound/outbound, network type (IPv4/IPv6/onion/i2p), version, ping, latency, bandwidth, services; disconnect and ban controls
 - **Network services** — local node service flags (NETWORK, WITNESS, COMPACT_FILTERS, P2P_V2 etc.)
 - **Difficulty retarget** — next retarget block, blocks remaining, estimated date, estimated % change based on actual block velocity this period
 - **IBD mode** — progress bar with real-time ETA computed from sync velocity; fee estimates disabled, only 8 blocks shown to reduce load
-- **Real-time block updates** — ZMQ subscriptions to Bitcoin Core for instant block arrival (< 1s latency) instead of polling; falls back to 10s polling if unavailable
+- **Real-time block updates** — ZMQ subscriptions to Bitcoin Core for instant block arrival (< 1s latency); falls back to 10s polling if unavailable
+- **New block audio** — optional block chime (toggle badge in titlebar, persisted across sessions)
 - **Bandwidth chart** — 10-minute history at 5-second resolution (120 samples), updated continuously
 - **Network themes** — automatic accent colour per chain: orange (mainnet), blue (testnet4), gold (signet), purple (regtest)
-- **Persistent layout** — panel order, column widths, and hidden state all persist across refreshes via localStorage
+- **Persistent layout** — panel order, column widths, and hidden state all persist across sessions via localStorage
 
 ---
 
@@ -44,11 +45,11 @@ Uses Bitcoin Core's native ZMQ for real-time block notifications (14x fewer RPC 
 blockwatch ships as a self-contained Linux desktop application. Download the latest `.AppImage` from the [releases page](https://github.com/echo-of-ghost/blockwatch/releases), make it executable, and run it — no installation required.
 
 ```bash
-chmod +x Blockwatch-2.0.0.AppImage
-./Blockwatch-2.0.0.AppImage
+chmod +x Blockwatch-2.2.0.AppImage
+./Blockwatch-2.2.0.AppImage
 ```
 
-The app embeds a Node.js server and opens directly to the dashboard. All configuration (cookie auth, ZMQ, environment variables) works the same as the browser version.
+The app embeds a Node.js server and opens directly to the dashboard. All configuration (cookie auth, ZMQ, environment variables) works the same as described below.
 
 To build the AppImage yourself:
 ```bash
@@ -76,7 +77,7 @@ Or fetch it directly from the releases page if provided there.
 
 **2. Verify:**
 ```bash
-gpg --verify Blockwatch-2.0.0.AppImage.asc Blockwatch-2.0.0.AppImage
+gpg --verify Blockwatch-2.2.0.AppImage.asc Blockwatch-2.2.0.AppImage
 ```
 
 A good signature looks like:
@@ -92,7 +93,7 @@ Any `BAD signature` result means the file has been tampered with — do not run 
 
 - [Node.js](https://nodejs.org) v18 or later
 - Bitcoin Core running locally with RPC enabled
-- (Optional) ZeroMQ support in Bitcoin Core (see ZMQ setup above) for real-time block updates
+- (Optional) ZeroMQ support in Bitcoin Core for real-time block updates
 
 ---
 
@@ -117,7 +118,7 @@ That's it for most setups. Bitcoin Core generates a `.cookie` file automatically
 **Option B — explicit credentials.** Keep `rpcuser`/`rpcpassword` in your conf and pass them to blockwatch via environment variables:
 
 ```bash
-BITCOIN_RPC_USER=youruser BITCOIN_RPC_PASS=yourpassword node server.js
+BITCOIN_RPC_USER=youruser BITCOIN_RPC_PASS=yourpassword npm run app
 ```
 
 If you switch from explicit credentials to cookie auth, restart bitcoind after removing them and verify the cookie appeared:
@@ -126,16 +127,14 @@ If you switch from explicit credentials to cookie auth, restart bitcoind after r
 ls -la ~/.bitcoin/.cookie
 ```
 
-### 2. Clone, install, and run
+### 2. Clone, install, and launch
 
 ```bash
 git clone https://github.com/echo-of-ghost/blockwatch.git
 cd blockwatch
 npm install
-node server.js
+npm run app
 ```
-
-Then open [http://localhost:3000](http://localhost:3000) in your browser.
 
 (If you skip `npm install`, blockwatch will still work but fall back to polling instead of using ZMQ for real-time updates.)
 
@@ -183,13 +182,6 @@ If no cookie is found at all, blockwatch prompts for RPC credentials in the term
 
 All configuration is via environment variables — no config file needed.
 
-### Web Server
-
-| Variable | Default | Description |
-|---|---|---|
-| `PORT` | `3000` | Port for the blockwatch web server |
-| `HOST` | `127.0.0.1` | Interface for the blockwatch web server to bind to |
-
 ### Bitcoin RPC
 
 | Variable | Default | Description |
@@ -211,111 +203,29 @@ All configuration is via environment variables — no config file needed.
 
 **Default (cookie auto-detect, ZMQ auto-connect):**
 ```bash
-node server.js
+npm run app
 ```
 
 **Non-default Bitcoin data directory:**
 ```bash
-BITCOIN_COOKIE_FILE=/mnt/bitcoin/.bitcoin/.cookie node server.js
+BITCOIN_COOKIE_FILE=/mnt/bitcoin/.bitcoin/.cookie npm run app
 ```
 
 **Explicit RPC credentials:**
 ```bash
-BITCOIN_RPC_USER=alice BITCOIN_RPC_PASS=hunter2 node server.js
+BITCOIN_RPC_USER=alice BITCOIN_RPC_PASS=hunter2 npm run app
 ```
 
 **Custom ZMQ endpoint** (if not on localhost or non-standard port):
 ```bash
-ZMQ_HOST=192.168.1.50 ZMQ_PORT=28332 node server.js
+ZMQ_HOST=192.168.1.50 ZMQ_PORT=28332 npm run app
 ```
 
 **Force a specific network** (when running multiple nodes):
 ```bash
-BITCOIN_RPC_PORT=38332 node server.js   # signet
-BITCOIN_RPC_PORT=48332 node server.js   # testnet4
-BITCOIN_RPC_PORT=18443 node server.js   # regtest
-```
-
-**Listen on all interfaces** (to access from another device on your LAN):
-```bash
-HOST=0.0.0.0 node server.js
-```
-
-> **Warning:** setting `HOST=0.0.0.0` exposes the dashboard on your network. blockwatch will print a warning at startup if this is detected. Ensure your firewall is configured appropriately.
-
----
-
-## Health endpoint
-
-blockwatch exposes a lightweight health endpoint at `/health` (also `/api/health`) for use with process monitors, uptime checkers, and systemd readiness probes.
-
-```
-GET http://localhost:3000/health
-```
-
-**Response — node reachable (`200 OK`):**
-```json
-{
-  "ok": true,
-  "height": 895210,
-  "chain": "main",
-  "synced": true,
-  "ibd": false,
-  "progress": 99.999,
-  "headers": 895210,
-  "ts": 1748000000000
-}
-```
-
-**Response — bitcoind unreachable (`503 Service Unavailable`):**
-```json
-{
-  "ok": false,
-  "error": "getblockcount: connect ECONNREFUSED 127.0.0.1:8332",
-  "ts": 1748000000000
-}
-```
-
-The endpoint makes only two RPC calls (`getblockcount`, `getblockchaininfo`) and is intentionally separate from the full `/api/data` fetch. It is not rate-limited.
-
-### systemd readiness check
-
-Add to your service file to delay dependent units until blockwatch confirms bitcoind is up:
-
-```ini
-ExecStartPost=/usr/bin/curl -sf http://127.0.0.1:3000/health
-```
-
----
-
-## Running as a background service
-
-To have blockwatch start automatically on boot, service files are included for both Linux and macOS.
-
-### Linux (systemd)
-
-```bash
-sudo cp blockwatch@.service /etc/systemd/system/
-sudo systemctl enable blockwatch@YOUR_USERNAME
-sudo systemctl start blockwatch@YOUR_USERNAME
-```
-
-Replace `YOUR_USERNAME` with your actual username. The service runs as that user, so cookie auth works automatically. Edit `WorkingDirectory` in the service file if blockwatch is not installed at `~/blockwatch`.
-
-### macOS (launchd)
-
-Edit `com.blockwatch.dashboard.plist` and replace `YOUR_USERNAME` with your actual username and update the path if needed, then:
-
-```bash
-cp com.blockwatch.dashboard.plist ~/Library/LaunchAgents/
-launchctl load ~/Library/LaunchAgents/com.blockwatch.dashboard.plist
-```
-
-Logs go to `/tmp/blockwatch.log` and `/tmp/blockwatch.error.log`.
-
-To stop:
-```bash
-launchctl unload ~/Library/LaunchAgents/com.blockwatch.dashboard.plist
+BITCOIN_RPC_PORT=38332 npm run app   # signet
+BITCOIN_RPC_PORT=48332 npm run app   # testnet4
+BITCOIN_RPC_PORT=18443 npm run app   # regtest
 ```
 
 ---
@@ -326,7 +236,7 @@ blockwatch can connect to a Bitcoin Core node on another machine. The node's RPC
 
 ```bash
 BITCOIN_RPC_HOST=192.168.1.50 BITCOIN_RPC_PORT=8332 \
-BITCOIN_RPC_USER=alice BITCOIN_RPC_PASS=hunter2 node server.js
+BITCOIN_RPC_USER=alice BITCOIN_RPC_PASS=hunter2 npm run app
 ```
 
 **Security note:** Bitcoin Core's RPC is not encrypted. For remote access, use one of:
@@ -359,7 +269,7 @@ Block hashes in the blocks table link to [mempool.space](https://mempool.space) 
 To point links at your own self-hosted [mempool](https://github.com/mempool/mempool) instance, find the `mspaceUrl` function in `client/shared.js` and update the base URL:
 
 ```js
-// In blockwatch.js — mspaceUrl function
+// In client/shared.js — mspaceUrl function
 function mspaceUrl(hash, chain){
   const p={testnet4:'testnet4/',signet:'signet/'};
   const safeHash=/^[0-9a-fA-F]{64}$/.test(hash||'')?hash:'';
@@ -378,11 +288,11 @@ If your instance only serves one network, you can simplify the path logic too.
 
 All panels are resizable by dragging the handles between them. Panels can also be dragged by their header to reorder them within or across columns. Hide a panel by right-clicking its header for a context menu. Hidden panels can be restored via the restore chips that appear in the titlebar.
 
-Panel order, column widths, and hidden state all persist automatically across page refreshes via localStorage.
+Panel order, column widths, and hidden state all persist automatically across sessions via localStorage.
 
 ### Terminal
 
-Press **Ctrl+`** (or **Cmd+`** on macOS) to open the built-in terminal drawer. Available in the Electron app only.
+Press **Ctrl+`** (or **Cmd+`** on macOS) to open the built-in terminal drawer.
 
 Type any bitcoin-cli RPC method and arguments directly:
 
@@ -398,6 +308,10 @@ getblock <hash> 2
 Arguments are parsed the same as bitcoin-cli — strings, numbers, and JSON all work. Use ↑/↓ to navigate history. Output is syntax-highlighted JSON.
 
 RPC calls are routed through the Electron main process. Credentials are never exposed to the renderer.
+
+### New block audio
+
+A subtle chime plays when a new block arrives. Toggle it with the **♪** badge in the top-right titlebar. The preference is persisted in localStorage across sessions. Audio uses a bundled `.ogg` file — no network request.
 
 ### Peer controls
 
@@ -428,28 +342,16 @@ blockwatch/
     preload.js                   — Context bridge: terminal RPC, platform class, toggle relay
   assets/
     icon.png                     — App icon (1024×1024)
+    block.ogg                    — New block chime audio
   index.html                     — Frontend markup
   blockwatch.css                 — Styles
   package.json                   — Dependencies and electron-builder config
-  blockwatch@.service            — systemd service file (Linux)
-  com.blockwatch.dashboard.plist — launchd service file (macOS)
   CHANGELOG.md
   README.md
   LICENSE
 ```
 
 Node.js built-ins handle HTTP, RPC, and data. ZMQ support is optional via the `zeromq` npm package for real-time block notifications. Without it, blockwatch falls back to polling automatically.
-
-To install with ZMQ:
-```bash
-npm install
-node server.js
-```
-
-To run without ZMQ (polling only):
-```bash
-node server.js   # falls back automatically if zeromq not installed
-```
 
 ---
 
@@ -486,12 +388,9 @@ getpeerinfo            (peer list, bandwidth)
 getnetworkinfo         (network stats, warnings)
 getchaintips           (orphan/alternate chains)
 uptime                 (node uptime)
-estimatesmartfee [1]   (next block, skipped during IBD)
-estimatesmartfee [6]   (6 blocks)
-estimatesmartfee [144] (1 day)
-estimatesmartfee [1008](economy)
+estimatesmartfee [1]   (next block fee, skipped during IBD)
 ```
-Total: **4 calls always + 4 fee calls = 8 calls/min** (4 calls/min during IBD)
+Total: **4 calls always + 1 fee call = 5 calls/min** (4 calls/min during IBD)
 
 **Deployment Refresh (every 5 minutes):**
 ```
@@ -503,9 +402,9 @@ Total: **0.2 calls/min**
 
 | Scenario | Calls/min | Notes |
 |----------|-----------|-------|
-| **With ZMQ** | ~13 | 0.5 block + 24 fast + 8 sparse + 0.2 deployment |
+| **With ZMQ** | ~30 | 0.5 block + 24 fast + 5 sparse + 0.2 deployment |
 | **Without ZMQ (polling)** | ~180 | Full snapshot every 10s |
-| **Reduction** | **14x** | Huge improvement with ZMQ |
+| **Reduction** | **6x** | Significant improvement with ZMQ |
 
 The `/api/data` endpoint serves cached state — no additional RPC calls made.
 
@@ -513,16 +412,17 @@ The `/api/data` endpoint serves cached state — no additional RPC calls made.
 
 ## Notes
 
-- **IBD (Initial Block Download)** — During sync, blockwatch automatically limits the blocks table to 8 entries (vs 12 when synced) and skips fee estimates to reduce RPC load on a node already running at capacity. ZMQ block events continue to fire normally. Everything returns to normal automatically once IBD completes.
-- **ZMQ configuration** — ZMQ is optional. If enabled in `bitcoin.conf`, blockwatch uses it for real-time block notifications (~0.5 RPC calls/min). If not available, blockwatch falls back to polling every 10 seconds (~180 RPC calls/min).
+- **IBD (Initial Block Download)** — During sync, blockwatch automatically limits the blocks table to 8 entries (vs 16 when synced) and skips fee estimates to reduce RPC load on a node already running at capacity. ZMQ block events continue to fire normally. Everything returns to normal automatically once IBD completes.
+- **ZMQ configuration** — ZMQ is optional. If enabled in `bitcoin.conf`, blockwatch uses it for real-time block notifications (~0.5 RPC calls/min for block events). If not available, blockwatch falls back to polling every 10 seconds.
 - **Cookie vs credentials** — Bitcoin Core will not create a `.cookie` file if `rpcuser`/`rpcpassword` are set in `bitcoin.conf`. If blockwatch is prompting for credentials on every launch, remove those lines from your conf and restart bitcoind.
-- **Fee estimates** — `estimatesmartfee` is called during the 60s sparse refresh, but only when not in IBD mode. On a freshly started node, fee estimates will show a "warming up" message rather than stale or synthetic data. Estimates update every minute once warmed up.
+- **Fee estimates** — `estimatesmartfee [1]` is called during the 60s sparse refresh, but only when not in IBD mode. On a freshly started node, fee estimates will show `—` rather than stale data. Estimates update every minute once warmed up.
+- **New block age** — When a new block arrives, the displayed age will be 5–10 seconds rather than 0s. This is expected: the `time` field is set by the miner, and several seconds elapse during P2P propagation, bitcoind processing, ZMQ delivery, and RPC round-trips before the dashboard renders it. The tip age counter ticks live every second between block events.
 - **Onion / I2P peers** — Peer addresses are displayed as plain text. Only clearnet addresses link to mempool.space since onion/i2p addresses are not resolvable there.
 - **Difficulty retarget estimate** — The estimated difficulty change is computed from actual measured block times during the current 2016-block period, not from the theoretical 10-minute target. The history resets at each new period.
 - **getdeploymentinfo** — Available in Bitcoin Core v24+. On older nodes this call returns null and the softforks panel renders nothing rather than erroring. Updates every 5 minutes.
 - **Mempool updates** — The mempool panel updates every 5 seconds (via fast refresh). This gives real-time visibility into tx count, size, and fee rates without the latency of a full sparse refresh.
-- **Bandwidth history** — The network bandwidth chart maintains a 10-minute rolling window at 5-second resolution (120 samples). This requires a ZMQ setup to avoid excessive polling; with ZMQ the 5s refresh adds minimal RPC overhead.
-- **Security** — The `/api/rpc` endpoint (used for peer disconnect/ban actions) is restricted to loopback connections only. The web server enforces an `Origin` header check so only localhost origins can make API calls. Every response includes a `Content-Security-Policy` header and a `Permissions-Policy` header that explicitly disables camera, microphone, geolocation, and payment APIs. If `HOST` is set to anything other than `127.0.0.1`, blockwatch prints a warning at startup.
+- **Bandwidth history** — The network bandwidth chart maintains a 10-minute rolling window at 5-second resolution (120 samples).
+- **Security** — The `/api/rpc` endpoint (used for peer disconnect/ban actions) is restricted to loopback connections only. Every response includes a `Content-Security-Policy` header and a `Permissions-Policy` header that explicitly disables camera, microphone, geolocation, and payment APIs.
 - **Connection errors** — If bitcoind is unreachable on first load, the connecting overlay is shown. After a successful first load, any subsequent connection errors surface in the status bar only — the dashboard stays visible with the last good data. The stale indicator shows how long data has been stale.
 
 ---
