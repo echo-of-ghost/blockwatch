@@ -870,10 +870,10 @@ a.ext-link:hover { color: var(--orange); }
 .snapshot-btn:hover { background: var(--osoft); color: var(--orange); }
 .snapshot-btn:active { transform: scale(0.97); }
 
-/* ── Sound toggle ── */
-.tb-sound-btn { background: none; border: none; color: var(--t4); font-size: var(--fs-xs); cursor: pointer; padding: 0 4px; font-family: var(--mono); transition: color var(--t-fast); line-height: 1; }
-.tb-sound-btn:hover { color: var(--t2); }
-.tb-sound-btn.sound-on { color: var(--orange); }
+/* ── Sound toggle badge ── */
+.tb-sound-badge { background: rgba(168,168,168,.1); border: none; color: var(--t3); font-size: var(--fs-xs); font-weight: 600; letter-spacing: .05em; font-family: var(--mono); padding: 2px 6px; border-radius: 2px; line-height: 1; cursor: pointer; transition: background var(--t-fast), color var(--t-fast); }
+.tb-sound-badge:hover { color: var(--t2); }
+.tb-sound-badge.sound-on { background: var(--odim); color: var(--orange); }
 
 /* ── Block timing hover tip ── */
 #bt-hover { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--border); border-top: 2px solid var(--orange); border-radius: 3px; padding: 5px 8px; font-size: var(--fs-xs); font-family: var(--mono); color: var(--t2); white-space: nowrap; display: none; z-index: 40; box-shadow: 0 4px 12px rgba(0,0,0,.4); }
