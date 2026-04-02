@@ -34,7 +34,6 @@ const layout = {
     mining: "Mining",
     peers: "Peers",
     services: "Services",
-    banned: "Banned",
     "peer-detail": "Peer",
   },
 
@@ -45,7 +44,6 @@ const layout = {
     "block-detail",
     "peers",
     "peer-detail",
-    "banned",
     "mining",
     "mempool-viz",
     "block-timing",
@@ -60,9 +58,9 @@ const layout = {
       { name: "services", hf: 0.16 },
     ],
     [
-      { name: "chain", hf: 0.405 },
-      { name: "mempool-viz", hf: 0.31 },
-      { name: "block-timing", hf: 0.285 },
+      { name: "chain",        hf: 0.22 },
+      { name: "mempool-viz",  hf: 0.46 },
+      { name: "block-timing", hf: 0.32 },
     ],
     [
       { name: "blocks", hf: 0.25 },
@@ -70,13 +68,12 @@ const layout = {
       { name: "mining", hf: 0.34 },
     ],
     [
-      { name: "peers", hf: 0.38 },
-      { name: "banned", hf: 0.08 },
+      { name: "peers", hf: 0.46 },
       { name: "peer-detail", hf: 0.54 },
     ],
   ],
 
-  _LS_KEY: "bw_layout_v42",
+  _LS_KEY: "bw_layout_v44",
 
   // ── Geometry helpers ─────────────────────────────────────────────────────────
 
@@ -1111,6 +1108,8 @@ const contextMenu = {
           if (item.dataset.action === "toggle") {
             const isMin = layout._minimized.has(this._panel);
             isMin ? layout.restore(this._panel) : layout.minimize(this._panel);
+          } else if (item.dataset.action === "terminal") {
+            terminalDrawer.show();
           } else if (item.dataset.action === "reset") {
             layout._reset();
           }
@@ -1129,8 +1128,9 @@ const contextMenu = {
     const isMin = layout._minimized.has(panel);
     el.innerHTML = `
       <div class="ctx-item" data-action="toggle"><span class="ctx-icon">${isMin ? "&#9672;" : "&#9634;"}</span>${isMin ? "show panel" : "hide panel"}</div>
+      <div class="ctx-sep"></div><div class="ctx-item" data-action="terminal"><span class="ctx-icon">›</span>open terminal</div>
       <div class="ctx-sep"></div>
-      <div class="ctx-item" data-action="reset"><span class="ctx-icon">&#8635;</span>reset layout</div>`;
+      <div class="ctx-item danger" data-action="reset"><span class="ctx-icon">&#8635;</span>reset layout</div>`;
 
     el.style.display = "block";
     const mw = el.offsetWidth,
@@ -1142,6 +1142,20 @@ const contextMenu = {
   hide() {
     const el = this._getEl();
     if (el) el.style.display = "none";
+  },
+
+  initGlobal() {
+    document.addEventListener("contextmenu", (e) => {
+      if (e.target.closest(".ph")) return; // panel header has its own handler
+      e.preventDefault();
+      const el = this._getEl();
+      if (!el) return;
+      this._panel = null;
+      el.innerHTML = `<div class="ctx-item" data-action="terminal"><span class="ctx-icon">›</span>open terminal</div>`;
+      el.style.display = "block";
+      el.style.left = Math.min(e.clientX + 2, window.innerWidth - el.offsetWidth - 6) + "px";
+      el.style.top = Math.min(e.clientY + 2, window.innerHeight - el.offsetHeight - 6) + "px";
+    });
   },
 };
 
@@ -1212,15 +1226,26 @@ const mobileBar = {
 // HERO STRIP — block height · next-block fee · mempool · peers
 // ═══════════════════════════════════════════════════════════════════════════════
 const heroStrip = {
-  _setVal(id, val) {
+  _lastHeight: null,
+  _soundOn: false,
+
+  _setVal(id, val, primary = false) {
     const el = $(id);
     if (!el) return;
     const s = String(val);
     if (el.textContent === s) return;
     el.textContent = s;
-    el.classList.remove("hero-flash");
-    void el.offsetWidth; // reflow to restart animation
-    el.classList.add("hero-flash");
+    el.classList.remove("hero-flash", "hero-flash-secondary");
+    void el.offsetWidth;
+    el.classList.add(primary ? "hero-flash" : "hero-flash-secondary");
+  },
+
+  _pulseHeightBar() {
+    const cell = $("hero-height")?.closest(".hero-cell");
+    if (!cell) return;
+    cell.classList.remove("hero-cell-new-block");
+    void cell.offsetWidth;
+    cell.classList.add("hero-cell-new-block");
   },
 
   render(d) {
@@ -1231,7 +1256,13 @@ const heroStrip = {
     const blocks = d.blocks || [];
     const now = Date.now() / 1000;
 
-    this._setVal("hero-height", fb(bc.blocks || 0));
+    const newHeight = bc.blocks || 0;
+    if (this._lastHeight !== null && newHeight > this._lastHeight) {
+      this._pulseHeightBar();
+      this._playBlockTick();
+    }
+    this._lastHeight = newHeight;
+    this._setVal("hero-height", fb(newHeight), true);
 
     const tipTime = blocks.length ? blocks[0].time : 0;
     const ageEl = $("hero-tip-age");
@@ -1259,5 +1290,29 @@ const heroStrip = {
       pSub.textContent =
         cin != null && cout != null ? cin + "↓  " + cout + "↑" : "—";
     }
+
+    // Panel header badges
+    const mpPh = $("mp-ph");
+    if (mpPh && mi.size != null) mpPh.textContent = fb(mi.size) + " txs";
+
+
   },
+
+  _initSound() {
+    const btn = $("sound-btn");
+    if (!btn) return;
+    try { this._soundOn = localStorage.getItem("bw-sound") === "1"; } catch (_) {}
+    btn.classList.toggle("sound-on", this._soundOn);
+    btn.addEventListener("click", () => {
+      this._soundOn = !this._soundOn;
+      btn.classList.toggle("sound-on", this._soundOn);
+      try { localStorage.setItem("bw-sound", this._soundOn ? "1" : "0"); } catch (_) {}
+    });
+  },
+
+  _playBlockTick() {
+    if (!this._soundOn) return;
+    new Audio("/assets/block.ogg").play().catch(() => {});
+  },
+
 };

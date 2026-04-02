@@ -168,11 +168,11 @@ const blocksPanel = {
         <div class="bd-section-label">fee distribution (sat/vB)</div>
         <div class="bd-pctile-chart">${bars}</div>
         <div class="bd-pctile-labels">
-          <span>p10:${esc(fmt(vals[0]))}</span>
-          <span>p25:${esc(fmt(vals[1]))}</span>
-          <span class="bd-pctile-mid-lbl">p50:${esc(fmt(vals[2]))}</span>
-          <span>p75:${esc(fmt(vals[3]))}</span>
-          <span>p90:${esc(fmt(vals[4]))}</span>
+          <span><span class="bd-pctile-key">p10</span>${esc(fmt(vals[0]))}</span>
+          <span><span class="bd-pctile-key">p25</span>${esc(fmt(vals[1]))}</span>
+          <span class="bd-pctile-mid-lbl"><span class="bd-pctile-key">p50</span>${esc(fmt(vals[2]))}</span>
+          <span><span class="bd-pctile-key">p75</span>${esc(fmt(vals[3]))}</span>
+          <span><span class="bd-pctile-key">p90</span>${esc(fmt(vals[4]))}</span>
         </div>`;
     })();
 
@@ -377,5 +377,31 @@ const blocksPanel = {
     el.addEventListener("keydown", (ev) => {
       if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); activate(); }
     });
+  },
+
+  exportTSV() {
+    if (!this._cache.length) return;
+    const cols = ["height", "hash", "time", "txs", "size", "weight", "fill_pct", "avgfeerate", "totalfee", "subsidy", "interval_s"];
+    const row = (b) => [
+      b.height ?? "",
+      b.hash || "",
+      b.time ? new Date(b.time * 1000).toISOString() : "",
+      b.txs ?? "",
+      b.size ?? "",
+      b.weight ?? "",
+      b.weight ? ((b.weight / 4000000) * 100).toFixed(2) : "",
+      b.avgfeerate ?? "",
+      b.totalfee ?? "",
+      b.subsidy ?? "",
+      b.interval ?? "",
+    ].map((v) => String(v).replace(/\t/g, " ")).join("\t");
+
+    const tsv = [cols.join("\t"), ...this._cache.map(row)].join("\n");
+    const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([tsv], { type: "text/tab-separated-values" }));
+    a.download = `blocks-${ts}.tsv`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   },
 };

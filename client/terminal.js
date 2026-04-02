@@ -2,8 +2,7 @@
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TERMINAL DRAWER
-// Electron-only. window.terminal (contextBridge) must be present.
-// Ctrl+T toggles the drawer. Commands are passed to bitcoind via IPC.
+// Ctrl+` toggles the drawer. Commands are passed to bitcoind via Electron IPC.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const terminalDrawer = (() => {
@@ -160,8 +159,6 @@ const terminalDrawer = (() => {
 
   // ── Wire input events ─────────────────────────────────────────────────────
   function init() {
-    if (!window.terminal) return; // browser mode — no-op
-
     const inp = _input();
     if (!inp) return;
 

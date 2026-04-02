@@ -44,10 +44,6 @@
               <div class="rb-inner" id="rb-chips"></div>
             </div>
             <span class="tb-sep rb-sep">·</span>
-            <span class="tb-clock-wrap"
-              ><span id="clock">—</span><span class="tb-utc">UTC</span></span
-            >
-            <span class="tb-sep">·</span>
 
             <button
               type="button"
@@ -57,6 +53,13 @@
             >
               snapshot ↓
             </button>
+            <button
+              type="button"
+              id="sound-btn"
+              class="tb-sound-badge"
+              aria-label="Toggle new block sound"
+              title="Toggle new block sound"
+            >♪</button>
             <span
               class="dot"
               id="live-dot"
@@ -209,6 +212,12 @@
               <span class="k">chain size</span
               ><span class="v" id="ni-sz">—</span>
             </div>
+            <div class="kv ni-kv-cfg" id="ni-utxo-row">
+              <span class="k">utxo set</span
+              ><span class="v" id="ni-utxo"
+                ><button type="button" class="la-toggle" id="ni-utxo-btn" aria-label="Fetch UTXO set info">fetch</button></span
+              >
+            </div>
             <div
               class="kv ni-kv-cfg"
               id="ni-pruned-row"
@@ -302,8 +311,6 @@
                 ><span class="dim" id="bw-sn">—</span></span
               >
             </div>
-            <div class="sec">fee estimates (sat/vB)</div>
-            <div id="fee-rows"></div>
           </div>
         </div>
 
@@ -348,9 +355,10 @@
               <circle cx="4.5" cy="8.5" r="1" fill="currentColor" /></svg
             ><span class="ph-title">block timing</span
             ><span class="ph-sep">|</span
-            ><span class="ph-meta" id="bt-ph">last 12</span>
+            ><span class="ph-meta" id="bt-ph">last 24</span>
           </div>
-          <div class="pb pb-chart">
+          <div class="pb pb-chart" style="position:relative">
+            <div id="bt-hover"></div>
             <canvas id="bt-canvas" style="width: 100%; display: block"></canvas>
             <div class="chart-leg">
               <span class="chart-leg-min" id="bt-min">—</span
@@ -376,7 +384,15 @@
               <circle cx="1.5" cy="8.5" r="1" fill="currentColor" />
               <circle cx="4.5" cy="8.5" r="1" fill="currentColor" /></svg
             ><span class="ph-title">blocks</span><span class="ph-sep">|</span
-            ><span class="ph-meta" id="blk-ph">—</span>
+            ><span class="ph-meta" id="blk-ph">—</span
+            ><span class="ph-right"
+              ><button
+                type="button"
+                id="blocks-tsv-btn"
+                class="ph-tsv-btn"
+                aria-label="Export blocks as TSV"
+              >blocks ↓</button></span
+            >
           </div>
           <div class="scroll-area">
             <table class="tbl" aria-label="Recent blocks">
@@ -441,7 +457,7 @@
               <div class="mn-hdr-sub">hashrate · <span id="mn-df">—</span> diff</div>
             </div>
             <div class="kv">
-              <span class="k dim">chainwork</span
+              <span class="k">chainwork</span
               ><span class="v mono v-copyable"
                 ><span id="mn-cw">—</span
                 ><span id="mn-cw-copy" data-copy="" class="copy-icon"
@@ -557,29 +573,7 @@
               </thead>
               <tbody id="peer-table-body"></tbody>
             </table>
-          </div>
-        </div>
-
-        <div class="panel" id="p-col4-mid" data-panel="banned">
-          <div class="ph">
-            <svg
-              class="ph-drag-icon"
-              viewBox="0 0 6 10"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              aria-hidden="true"
-            >
-              <circle cx="1.5" cy="1.5" r="1" fill="currentColor" />
-              <circle cx="4.5" cy="1.5" r="1" fill="currentColor" />
-              <circle cx="1.5" cy="5" r="1" fill="currentColor" />
-              <circle cx="4.5" cy="5" r="1" fill="currentColor" />
-              <circle cx="1.5" cy="8.5" r="1" fill="currentColor" />
-              <circle cx="4.5" cy="8.5" r="1" fill="currentColor" /></svg
-            ><span class="ph-title">banned</span><span class="ph-sep">|</span
-            ><span class="ph-meta" id="ban-ph">—</span>
-          </div>
-          <div class="scroll-area pb" id="ban-rows">
-            <div class="ban-empty">no bans</div>
+            <div id="ban-inline"></div>
           </div>
         </div>
 
@@ -738,7 +732,6 @@
     <script src="client/charts.js"></script>
     <script src="client/ui.js"></script>
     <script src="client/panels/node.js"></script>
-    <script src="client/panels/fees.js"></script>
     <script src="client/panels/peers.js"></script>
     <script src="client/panels/mining.js"></script>
     <script src="client/panels/mempool.js"></script>

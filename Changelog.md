@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-04-02
+
+### Added
+- **New block audio**: A subtle chime plays on every new block. Uses a bundled `assets/block.ogg` — no format detection, no network request, no latency. Preference persisted in `localStorage`.
+- **Audio toggle badge**: The sound toggle is now a styled badge in the titlebar (matching `tb-ver-badge` / `tb-sync-badge`) — muted grey when off, orange-tinted when on. Previously it was a bare `♪` with no visual weight.
+- **Block timing gradient fill**: A subtle gradient area fill now traces behind the block timing bars, giving the chart visual grounding instead of floating bars.
+
+### Changed
+- **Electron-only**: Removed standalone browser support. blockwatch is now exclusively an Electron desktop application. Run with `npm run app` or the packaged AppImage. `node server.js` is no longer a supported usage pattern.
+- **Hero bar typography**: All four hero strip values now share the same `--fs-2xl` font size. Previously the first value was larger than the rest.
+- **Fee estimates simplified**: Reduced from 4 parallel `estimatesmartfee` calls (targets 1, 6, 144, 1008) to a single call (target 1). Only the next-block fee rate is displayed, in the hero strip. RPC overhead reduced accordingly.
+- **Tip age ticks live**: The chain tip age and hero tip age now update every second via the staleness interval, using `poller._lastData`. Previously they only updated on SSE broadcast, causing the counter to freeze between blocks.
+
+### Removed
+- **Fee estimates panel**: Standalone fee estimates panel removed from the layout. Next-block fee (sat/vB) is shown in the hero strip only.
+- **`client/panels/fees.js`**: Module deleted. The single line it set (`ch-tip-age`) is now inlined in `boot.js`.
+
+### Fixed
+- **Block sound silent after restart**: Format discovery chain (`mp3` → `ogg` fallback) caused the first block after every restart to play no sound, as the discovery resolved too late. Replaced with a single hardcoded `.ogg` instantiation.
+- **TSV export wrong columns**: Block panel TSV export used `b.txCount` (undefined) and `b.fillPct` (not stored on block objects). Fixed to use `b.txs` and compute fill % inline from `b.weight`.
+- **Dead event listener**: `reset-layout-btn` was wired in `boot.js` but the element does not exist in the HTML. Listener removed.
+
 ## [2.1.0] - 2026-03-30
 
 ### Added

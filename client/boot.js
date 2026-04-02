@@ -21,7 +21,10 @@ function renderAll(d) {
 
   safeRender('hero',    () => heroStrip.render(d));
   safeRender('node',    () => nodePanel.render(d));
-  safeRender('chain',   () => chainPanel.render(d));
+  // Chain tip age — inline, chainPanel module removed
+  const _blocks = d.blocks || [];
+  const _now = Date.now() / 1000;
+  setText("ch-tip-age", _blocks.length && _blocks[0].time ? utils.fmtAgeAgo(_now - _blocks[0].time) : "—");
   safeRender('mempool', () => mempoolPanel.render(d));
   safeRender('network', () => network.render(d.netIn, d.netOut, d.totalRecv, d.totalSent));
   safeRender('peers',   () => peersPanel.render(d));
@@ -61,6 +64,25 @@ charts.init();
 // Bandwidth chart hover
 network._initHover();
 
+// Services badge hover description
+document.addEventListener('mouseover', e => {
+  const badge = e.target.closest('.svc-tip[data-svc-tip]');
+  const desc = $('svc-desc');
+  if (!desc) return;
+  if (badge && badge.dataset.svcTip) {
+    desc.textContent = badge.dataset.svcTip;
+    desc.classList.add('svc-desc-visible');
+  } else if (!e.target.closest('.svc-with-tips')) {
+    desc.classList.remove('svc-desc-visible');
+  }
+});
+document.addEventListener('mouseout', e => {
+  if (!e.target.closest('.svc-with-tips')) {
+    const desc = $('svc-desc');
+    if (desc) desc.classList.remove('svc-desc-visible');
+  }
+});
+
 // Global copy-to-clipboard delegation
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-copy]');
@@ -93,16 +115,15 @@ new MutationObserver(() => a11yCopyIcons()).observe(document.body, { childList: 
 document.addEventListener('click', () => contextMenu.hide());
 document.addEventListener('keydown', e => { if (e.key === 'Escape') contextMenu.hide(); });
 
-// Terminal drawer — Electron only (body.electron set by preload)
-if (window.terminal) {
-  terminalDrawer.init();
-  // Primary: globalShortcut in main relays via IPC → preload → document CustomEvent
-  document.addEventListener('terminal:toggle', () => terminalDrawer.toggle());
-  // Fallback: direct keydown
-  document.addEventListener('keydown', e => {
-    if (e.ctrlKey && e.key === '`') { e.preventDefault(); terminalDrawer.toggle(); }
-  });
-}
+// Terminal drawer
+terminalDrawer.init();
+contextMenu.initGlobal();
+// Primary: globalShortcut in main relays via IPC → preload → document CustomEvent
+document.addEventListener('terminal:toggle', () => terminalDrawer.toggle());
+// Fallback: direct keydown
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey && e.key === '`') { e.preventDefault(); terminalDrawer.toggle(); }
+});
 
 // Peer table click delegation
 $('peer-table-body')?.addEventListener('click', e => {
@@ -155,12 +176,8 @@ $('blk-body')?.addEventListener('keydown', e => {
 $('conn-retry')?.addEventListener('click', () => poller.retryNow());
 $('la-reveal-btn')?.addEventListener('click', () => nodePanel.toggleLocalAddrs());
 $('peers-tsv-btn')?.addEventListener('click', () => peersPanel.exportTSV());
+$('blocks-tsv-btn')?.addEventListener('click', () => blocksPanel.exportTSV());
 $('snapshot-btn')?.addEventListener('click', () => poller.exportJSON());
-
-// Reset layout button
-$('reset-layout-btn')?.addEventListener('click', () => {
-  layout._reset();
-});
 
 // Peer filter
 (function initPeerFilter() {
@@ -191,21 +208,18 @@ $('reset-layout-btn')?.addEventListener('click', () => {
 banList.refresh();
 setInterval(() => banList.refresh(), 60000);
 
-// Clock + staleness indicator — every second
+// Staleness indicator — every second
 setInterval(() => {
-  const now = new Date();
-  const iso = now.toISOString(); // e.g. "2026-03-25T14:32:07.000Z"
-  const dateStr = iso.slice(0, 10);           // "2026-03-25"
-  const hhmm    = iso.slice(11, 16);           // "14:32"
-  const secs    = ':' + iso.slice(17, 19);     // ":07"
-  const clockEl = $('clock');
-  if (clockEl) {
-    clockEl.innerHTML =
-      '<span class="clock-date">' + dateStr + ' </span>' +
-      hhmm +
-      '<span class="clock-secs">' + secs + '</span>';
-  }
   mobileBar.tickClock();
+
+  // Tick tip age elements every second so they stay live between SSE events
+  const _tipTime = poller._lastData?.blocks?.[0]?.time;
+  if (_tipTime) {
+    const _tipAge = utils.fmtAgeAgo(Date.now() / 1000 - _tipTime);
+    setText('ch-tip-age', _tipAge);
+    const _heroAge = $('hero-tip-age');
+    if (_heroAge) _heroAge.textContent = _tipAge;
+  }
 
   const stale = $('sb-stale');
   if (!stale) return;
@@ -249,4 +263,5 @@ document.addEventListener('visibilitychange', () => {
 
 // Start
 tooltipEngine.init();
+heroStrip._initSound();
 poller.start();

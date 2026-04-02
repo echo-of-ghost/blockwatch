@@ -38,7 +38,7 @@ const nodePanel = {
 
     this._renderTitlebar(bc, ni, d.uptime, blocks, d);
     this._renderNodeInfo(bc, ni, d.rpcNode, blocks, now);
-    this._renderChainTips(d.chainTips || []);
+    this._renderChainTips(d.chainTips || [], bc.blocks || 0);
     this._renderRetarget(bc.blocks || 0, bc.mediantime || 0, cts);
     this._renderConsensus(bc, cts);
     this._renderStorage(bc);
@@ -51,7 +51,7 @@ const nodePanel = {
     }
   },
 
-  _renderTitlebar(bc, ni, uptime, blocks, d = {}) {
+  _renderTitlebar(bc, ni, uptime, _blocks, d = {}) {
     const synced = (bc.verificationprogress || 0) >= 0.9995;
 
     setText("tb-ver", (ni.subversion || "").replace(/^\/|\/$/g, ""));
@@ -168,7 +168,7 @@ const nodePanel = {
     setDisplay("sync-section", bc.initialblockdownload);
   },
 
-  _renderChainTips(tips) {
+  _renderChainTips(tips, currentHeight) {
     const tipsEl = $("ni-tips");
     if (!tipsEl) return;
 
@@ -180,19 +180,27 @@ const nodePanel = {
       return;
     }
 
+    const DISPLAY_WINDOW = 144; // expire forks older than ~1 day
+
     const active = tips.filter((t) => t.status === "active").length;
-    const deepForks = tips.filter(
-      (t) => t.status === "valid-fork" && t.branchlen > 1,
-    );
-    const orphans = tips.filter(
-      (t) => t.status === "valid-fork" && t.branchlen === 1,
-    );
+
+    // Display: all valid-forks within 144 blocks, sorted newest by height, top 2
+    const recentDeepForks = tips
+      .filter((t) => t.status === "valid-fork")
+      .filter((t) => !currentHeight || !t.height || (currentHeight - t.height) <= DISPLAY_WINDOW)
+      .sort((a, b) => (b.height || 0) - (a.height || 0))
+      .slice(0, 2);
+
     const validHdr = tips.filter((t) => t.status === "valid-headers");
     const invalid = tips.filter((t) => t.status === "invalid");
 
-    if (deepForks.length) {
+    // Count orphans (branchlen === 1) only within the display window for the summary label
+    const recentOrphans = recentDeepForks.filter((t) => t.branchlen === 1);
+    const recentSignificant = recentDeepForks.filter((t) => t.branchlen > 1);
+
+    if (recentSignificant.length) {
       tipsEl.textContent =
-        deepForks.length + " fork" + (deepForks.length > 1 ? "s" : "");
+        recentSignificant.length + " fork" + (recentSignificant.length > 1 ? "s" : "");
       tipsEl.className = "v neg";
     } else if (invalid.length) {
       tipsEl.textContent = invalid.length + " invalid";
@@ -200,16 +208,16 @@ const nodePanel = {
     } else if (validHdr.length) {
       tipsEl.textContent = validHdr.length + " valid-headers";
       tipsEl.className = "v o";
-    } else if (orphans.length) {
+    } else if (recentOrphans.length) {
       tipsEl.textContent =
-        orphans.length + " orphan" + (orphans.length > 1 ? "s" : "");
+        recentOrphans.length + " orphan" + (recentOrphans.length > 1 ? "s" : "");
       tipsEl.className = "v dim";
     } else {
       tipsEl.textContent = active + " active";
       tipsEl.className = "v dim";
     }
 
-    const nonActive = [...deepForks, ...invalid, ...validHdr, ...orphans];
+    const nonActive = [...recentDeepForks, ...invalid, ...validHdr];
     let tipListEl = $("ni-tips-list");
     if (!tipListEl) {
       tipListEl = document.createElement("div");
@@ -223,7 +231,7 @@ const nodePanel = {
       return;
     }
 
-    const MAX_TIPS = 4;
+    const MAX_TIPS = 2;
     const visible = nonActive.slice(0, MAX_TIPS);
     const overflow = nonActive.length - visible.length;
 
@@ -231,10 +239,12 @@ const nodePanel = {
       t.status === "invalid"
         ? "failed"
         : t.status === "valid-fork" && t.branchlen > 1
-          ? "failed"
-          : t.status === "valid-headers"
-            ? "locked"
-            : "defined";
+          ? "signal"
+          : t.status === "valid-fork"
+            ? "defined"
+            : t.status === "valid-headers"
+              ? "locked"
+              : "defined";
 
     tipListEl.innerHTML =
       `<div class="tip-list">` +
@@ -437,6 +447,35 @@ const nodePanel = {
     if (pruneRow) pruneRow.style.display = bc.pruned ? "" : "none";
     if (bc.pruned && bc.pruneheight != null)
       setText("ni-pruneheight", "#" + fb(bc.pruneheight));
+
+    if (!this._utxoBtnWired) {
+      this._utxoBtnWired = true;
+      const btn = $("ni-utxo-btn");
+      if (btn) btn.addEventListener("click", () => this._fetchUtxoSet());
+    }
+  },
+
+  _utxoBtnWired: false,
+
+  async _fetchUtxoSet() {
+    const btn = $("ni-utxo-btn");
+    const el = $("ni-utxo");
+    if (!el) return;
+    if (btn) { btn.disabled = true; btn.textContent = "scanning…"; }
+    try {
+      const res = await fetch("/api/rpc", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ method: "gettxoutsetinfo", params: [] }),
+      });
+      const j = await res.json();
+      if (j.error) throw new Error(j.error);
+      const r = j.result;
+      el.textContent = fb(r.txouts) + " utxos · " + utils.fmtBytes(r.disk_size || r.bogosize || 0);
+    } catch (e) {
+      if (btn) { btn.disabled = false; btn.textContent = "retry"; }
+      toastStack.add("gettxoutsetinfo: " + e.message);
+    }
   },
 
   _renderNetworkReachability(ni) {
@@ -477,10 +516,20 @@ const nodePanel = {
     const svcs = ni.localservicesnames || [];
     setText("svc-ph", svcs.length ? svcs.length + " active" : "—");
 
+    const SVC_DESC = {
+      NETWORK:          "Full block relay — serves complete historical blocks to peers",
+      GETUTXO:          "Can respond to UTXO queries (rarely used)",
+      BLOOM:            "Supports Bloom filter queries for SPV clients",
+      WITNESS:          "SegWit-capable — validates and relays witness data",
+      COMPACT_FILTERS:  "Serves BIP-157/158 compact block filters for light clients",
+      NETWORK_LIMITED:  "Pruned node — serves only recent blocks, not full history",
+      P2P_V2:           "BIP-324 encrypted transport — peers can connect over v2",
+    };
+
     const grid = $("svc-grid");
     if (grid) {
       grid.innerHTML =
-        '<div class="pd-svc">' +
+        '<div class="pd-svc svc-with-tips">' +
         svcs
           .map((s) => {
             const cls = ["NETWORK", "WITNESS"].includes(s)
@@ -488,10 +537,12 @@ const nodePanel = {
               : ["BLOOM", "COMPACT_FILTERS", "P2P_V2"].includes(s)
                 ? "svc-cap"
                 : "svc-ltd";
-            return `<span class="${cls}">${esc(s)}</span>`;
+            const desc = SVC_DESC[s] || "";
+            return `<span class="${cls} svc-tip" data-svc-tip="${esc(desc)}">${esc(s)}</span>`;
           })
           .join("") +
-        "</div>";
+        "</div>" +
+        '<div class="svc-desc" id="svc-desc"></div>';
     }
   },
 

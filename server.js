@@ -7,16 +7,48 @@ const http = require("http"),
 const RPC_HOST = process.env.BITCOIN_RPC_HOST || "127.0.0.1";
 let RPC_PORT = parseInt(process.env.BITCOIN_RPC_PORT || "0");
 const SERVER_PORT = parseInt(process.env.PORT || "3000");
-const SERVER_HOST = process.env.HOST || "127.0.0.1";
 
-// HTTP server is enabled when running inside Electron (always) or when the
-// BLOCKWATCH_HTTP=1 env var is explicitly set (browser/self-hosted mode).
-const HTTP_ENABLED = !!process.versions.electron || process.env.BLOCKWATCH_HTTP === "1";
+// Remote mode: BLOCKWATCH_REMOTE=1 binds to 0.0.0.0 and enables basic auth.
+// Default is loopback-only (Electron window accesses it directly).
+const REMOTE_MODE = process.env.BLOCKWATCH_REMOTE === "1";
+const SERVER_HOST = process.env.HOST || (REMOTE_MODE ? "0.0.0.0" : "127.0.0.1");
+
 const ZMQ_HOST = process.env.ZMQ_HOST || "127.0.0.1";
 const ZMQ_PORT = parseInt(process.env.ZMQ_PORT || "28332");
 
 let RPC_USER = "",
   RPC_PASS = "";
+
+// Remote dashboard credentials — only used when REMOTE_MODE is enabled.
+let REMOTE_USER = process.env.BLOCKWATCH_USER || "";
+let REMOTE_PASS = process.env.BLOCKWATCH_PASS || "";
+
+// Timing-safe credential comparison (hashes both sides to equalise length).
+function _credEq(a, b) {
+  const ha = crypto.createHash("sha256").update(String(a)).digest();
+  const hb = crypto.createHash("sha256").update(String(b)).digest();
+  return crypto.timingSafeEqual(ha, hb);
+}
+
+function checkRemoteAuth(req, res) {
+  if (!REMOTE_MODE) return true;
+  const header = req.headers.authorization || "";
+  if (!header.startsWith("Basic ")) {
+    res.writeHead(401, { "WWW-Authenticate": 'Basic realm="blockwatch"', "Content-Type": "text/plain" });
+    res.end("Unauthorized");
+    return false;
+  }
+  const decoded = Buffer.from(header.slice(6), "base64").toString();
+  const colon = decoded.indexOf(":");
+  const u = colon >= 0 ? decoded.slice(0, colon) : decoded;
+  const p = colon >= 0 ? decoded.slice(colon + 1) : "";
+  if (!_credEq(u, REMOTE_USER) || !_credEq(p, REMOTE_PASS)) {
+    res.writeHead(401, { "WWW-Authenticate": 'Basic realm="blockwatch"', "Content-Type": "text/plain" });
+    res.end("Unauthorized");
+    return false;
+  }
+  return true;
+}
 
 const COOKIE_CANDIDATES = [
   process.env.BITCOIN_COOKIE_FILE
@@ -307,6 +339,18 @@ function printBanner() {
 }
 
 async function loadAuth() {
+  // Remote dashboard credentials
+  if (REMOTE_MODE) {
+    if (!REMOTE_USER || !REMOTE_PASS) {
+      process.stdout.write("  " + c(A.pos, "! ") + c(A.t2, "remote mode — set dashboard credentials") + "\n\n");
+      REMOTE_USER = await prompt("  " + c(A.t3, "dashboard user".padEnd(14)) + "  ");
+      REMOTE_PASS = await prompt("  " + c(A.t3, "dashboard pass".padEnd(14)) + "  ", true);
+      process.stdout.write("\n");
+    } else {
+      row("remote auth", "env vars  " + c(A.t4, "(" + REMOTE_USER + ")"), A.grn);
+    }
+  }
+
   if (process.env.BITCOIN_RPC_USER && process.env.BITCOIN_RPC_PASS) {
     RPC_USER = process.env.BITCOIN_RPC_USER;
     RPC_PASS = process.env.BITCOIN_RPC_PASS;
@@ -568,16 +612,10 @@ function normalizeBlock(hash, hdr, st) {
 
 // conf_target values are included so the client label always matches what was
 // requested. If you change the targets here, the client labels update automatically.
-function normalizeFees(fast, med, slow, eco) {
+function normalizeFees(fast) {
   return {
     fast: fast?.feerate ? Math.round(fast.feerate * 1e5) : null,
     fast_target: 1,
-    med: med?.feerate ? Math.round(med.feerate * 1e5) : null,
-    med_target: 6,
-    slow: slow?.feerate ? Math.round(slow.feerate * 1e5) : null,
-    slow_target: 144,
-    eco: eco?.feerate ? Math.round(eco.feerate * 1e5) : null,
-    eco_target: 1008,
   };
 }
 
@@ -625,17 +663,10 @@ async function initState() {
       safe("getchaintips"),
     ]);
 
-  const [feeFast, feeMed, feeSlow, feeEco] = ibd
-    ? [null, null, null, null]
-    : await Promise.all([
-        safe("estimatesmartfee", [1]),
-        safe("estimatesmartfee", [6]),
-        safe("estimatesmartfee", [144]),
-        safe("estimatesmartfee", [1008]),
-      ]);
+  const feeFast = ibd ? null : await safe("estimatesmartfee", [1]);
 
   const tipHeight = blockchain.blocks;
-  const count = Math.min(ibd ? 8 : 12, tipHeight + 1);
+  const count = Math.min(ibd ? 8 : 24, tipHeight + 1);
   const heights = Array.from({ length: count }, (_, i) => tipHeight - i).filter(
     (h) => h >= 0,
   );
@@ -671,7 +702,7 @@ async function initState() {
     peers: Array.isArray(peerInfo) ? peerInfo : [],
     blocks,
     chainTxStats: chainTxStats || {},
-    fees: normalizeFees(feeFast, feeMed, feeSlow, feeEco),
+    fees: normalizeFees(feeFast),
     netTotals: netTotals || {},
     uptime: uptime || 0,
     deploymentInfo: deploymentInfo || {},
@@ -708,24 +739,34 @@ async function onNewBlock() {
     }
 
     // Dedup: skip if we've already processed this height
-    if (bc.blocks <= (_state.blocks[0]?.height ?? -1)) return;
-
-    const blockHash = bc.bestblockhash;
-    if (!blockHash) return;
+    const knownHeight = _state.blocks[0]?.height ?? -1;
+    if (bc.blocks <= knownHeight) return;
 
     const ibd = bc.initialblockdownload || false;
-    const [hdr, st, mi, cts] = await Promise.all([
-      safe("getblockheader", [blockHash, true]),
+    const maxBlocks = ibd ? 8 : 24;
+
+    // Gap fill: if more than one block arrived since last update, fetch them all
+    const gap = bc.blocks - knownHeight;
+    const fetchCount = Math.min(gap, maxBlocks);
+    const heights = Array.from({ length: fetchCount }, (_, i) => bc.blocks - i);
+
+    const hashes = await Promise.all(heights.map(h => safe("getblockhash", [h])));
+
+    const [headers, stats, mi, cts] = await Promise.all([
+      Promise.all(hashes.map(h => h ? safe("getblockheader", [h, true]) : null)),
       ibd
-        ? Promise.resolve(null)
-        : safe("getblockstats", [blockHash, BLOCK_STATS_FIELDS]),
+        ? Promise.resolve(heights.map(() => null))
+        : Promise.all(hashes.map(h => h ? safe("getblockstats", [h, BLOCK_STATS_FIELDS]) : null)),
       safe("getmempoolinfo"),
       safe("getchaintxstats", [Math.min(2016, bc.blocks || 1)]),
     ]);
 
-    // If the block header failed, skip the block update rather than pushing
-    // a broken entry into state. blockchain + mempool still update below.
-    if (!hdr) {
+    const newBlocks = hashes
+      .map((hash, i) => hash && headers[i] ? normalizeBlock(hash, headers[i], stats[i]) : null)
+      .filter(Boolean);
+
+    // If the tip header failed, still update blockchain + mempool
+    if (!newBlocks.length) {
       _state.blockchain = bc;
       if (mi) _state.mempoolInfo = mi;
       if (cts) _state.chainTxStats = cts;
@@ -735,11 +776,8 @@ async function onNewBlock() {
       return;
     }
 
-    const newBlock = normalizeBlock(blockHash, hdr, st);
-    const maxBlocks = ibd ? 8 : 12;
-
     _state.blockchain = bc;
-    _state.blocks = [newBlock, ..._state.blocks].slice(0, maxBlocks);
+    _state.blocks = [...newBlocks, ..._state.blocks].slice(0, maxBlocks);
     if (mi) _state.mempoolInfo = mi;
     if (cts) _state.chainTxStats = cts;
     delete _state.error;
@@ -890,18 +928,8 @@ function startSparseRefresh() {
         safe("getchaintips"),
         safe("uptime"),
       ];
-      const feeReqs = ibd
-        ? []
-        : [
-            safe("estimatesmartfee", [1]),
-            safe("estimatesmartfee", [6]),
-            safe("estimatesmartfee", [144]),
-            safe("estimatesmartfee", [1008]),
-          ];
-
-      const results = await Promise.all([...base, ...feeReqs]);
+      const results = await Promise.all(base);
       const [peers, ni, tips, uptime] = results;
-      const feeResults = results.slice(4);
 
       if (peers) _state.peers = peers;
       if (ni) {
@@ -914,8 +942,10 @@ function startSparseRefresh() {
       }
       if (tips) _state.chainTips = tips;
       if (uptime != null) _state.uptime = uptime;
-      if (!ibd && feeResults.length === 4)
-        _state.fees = normalizeFees(...feeResults);
+      if (!ibd) {
+        const feeFast = await safe("estimatesmartfee", [1]);
+        _state.fees = normalizeFees(feeFast);
+      }
       if (!peers && !ni && !tips && uptime == null) return;
       _state.ts = Date.now();
       broadcast();
@@ -944,11 +974,14 @@ function startDeploymentRefresh() {
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://localhost");
+
+  // Remote mode: basic auth gates all requests. Check before anything else.
+  if (!checkRemoteAuth(req, res)) return;
+
   const origin = req.headers.origin || "";
-  // CSRF defence: browsers always send an Origin header on cross-origin requests.
-  // Rejecting any Origin that isn't localhost means a malicious page open in the
-  // same browser cannot reach this server — even if it's on 127.0.0.1.
-  if (origin && !origin.match(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/)) {
+  // CSRF defence (local mode only): browsers always send an Origin header on
+  // cross-origin requests. In remote mode, basic auth is the protection layer.
+  if (!REMOTE_MODE && origin && !origin.match(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/)) {
     res.writeHead(403);
     res.end("forbidden");
     return;
@@ -1067,27 +1100,29 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // ── /api/rpc — privileged loopback-only proxy for peer management ──────────
+  // ── /api/rpc — privileged proxy for peer management ──────────────────────
   if (url.pathname === "/api/rpc" && req.method === "POST") {
-    // SECURITY: proxies disconnect and ban calls. Only allow loopback connections.
-    // If HOST=0.0.0.0, do not expose this to untrusted networks.
-    const remote = req.socket.remoteAddress;
-    const isLoopback = (() => {
-      if (!remote) return false;
-      if (remote === "::1") return true;
-      const ipv4 = remote.startsWith("::ffff:") ? remote.slice(7) : remote;
-      const parts = ipv4.split(".");
-      if (parts.length !== 4) return false;
-      const nums = parts.map(Number);
-      return (
-        nums.every((n, i) => Number.isInteger(n) && n >= 0 && n <= 255) &&
-        nums[0] === 127
-      );
-    })();
-    if (!isLoopback) {
-      res.writeHead(403, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ error: "forbidden" }));
-      return;
+    // In remote mode, basic auth (already checked above) is the gate.
+    // In local mode, restrict to loopback connections only.
+    if (!REMOTE_MODE) {
+      const remote = req.socket.remoteAddress;
+      const isLoopback = (() => {
+        if (!remote) return false;
+        if (remote === "::1") return true;
+        const ipv4 = remote.startsWith("::ffff:") ? remote.slice(7) : remote;
+        const parts = ipv4.split(".");
+        if (parts.length !== 4) return false;
+        const nums = parts.map(Number);
+        return (
+          nums.every((n) => Number.isInteger(n) && n >= 0 && n <= 255) &&
+          nums[0] === 127
+        );
+      })();
+      if (!isLoopback) {
+        res.writeHead(403, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "forbidden" }));
+        return;
+      }
     }
     let body = "",
       done = false;
@@ -1112,6 +1147,7 @@ const server = http.createServer(async (req, res) => {
           "disconnectnode",
           "setban",
           "listbanned",
+          "gettxoutsetinfo",
         ]);
         if (!ALLOWED_METHODS.has(method))
           throw new Error("method not allowed: " + method);
@@ -1170,6 +1206,24 @@ const server = http.createServer(async (req, res) => {
     res.end(_staticKey.slice(1) + " not found");
     return;
   }
+
+  // ── /assets/* — user-placed files (e.g. block.mp3 for sounds) ─────────────
+  if (url.pathname.startsWith("/assets/")) {
+    const filename = path.basename(url.pathname); // basename strips traversal
+    const assetPath = path.join(__dirname, "assets", filename);
+    try {
+      const buf = fs.readFileSync(assetPath);
+      const ext = path.extname(filename).toLowerCase();
+      const mime = ext === ".mp3" ? "audio/mpeg" : ext === ".wav" ? "audio/wav" : ext === ".ogg" ? "audio/ogg" : "application/octet-stream";
+      res.writeHead(200, { "Content-Type": mime, "Cache-Control": "public, max-age=3600" });
+      res.end(buf);
+    } catch (_) {
+      res.writeHead(404);
+      res.end("not found");
+    }
+    return;
+  }
+
   res.writeHead(404);
   res.end("not found");
 });
@@ -1202,17 +1256,20 @@ async function start() {
 
   return new Promise((resolve) => {
     server.listen(SERVER_PORT, SERVER_HOST, () => {
-      if (SERVER_HOST !== "127.0.0.1" && SERVER_HOST !== "localhost") {
-        row(
-          "warning",
-          "dashboard exposed on " + SERVER_HOST + " — ensure firewall is set",
-          A.neg,
-        );
-      }
       row("node", RPC_HOST + ":" + RPC_PORT);
       const bar = c(A.t4, "-".repeat(Math.min(W - 4, 38)));
       process.stdout.write("  " + bar + "\n");
-      row("dashboard", "http://" + SERVER_HOST + ":" + SERVER_PORT, A.pos);
+      if (REMOTE_MODE) {
+        row("mode", "remote  " + c(A.t4, "(basic auth enabled)"), A.pos);
+        row("access", "http://<your-ip>:" + SERVER_PORT, A.pos);
+        row(
+          "warning",
+          "ensure firewall restricts access as needed",
+          A.neg,
+        );
+      } else {
+        row("dashboard", "http://127.0.0.1:" + SERVER_PORT, A.pos);
+      }
       row(
         "health",
         "http://" + SERVER_HOST + ":" + SERVER_PORT + "/api/health",
@@ -1225,10 +1282,6 @@ async function start() {
 }
 
 if (require.main === module) {
-  if (!HTTP_ENABLED) {
-    console.log("blockwatch: use the Electron app, or set BLOCKWATCH_HTTP=1 to enable browser mode.");
-    process.exit(0);
-  }
   start().catch((e) => { console.error(e); process.exit(1); });
 }
 

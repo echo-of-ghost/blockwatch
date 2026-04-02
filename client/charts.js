@@ -109,9 +109,11 @@ const charts = {
       const xOf = (i) => pl + (i / (n - 1)) * plotW;
       const yOf = (s) => pt + (1 - s / maxSize) * plotH;
 
-      // Subtle horizontal grid lines
+      // Subtle horizontal grid lines with y-axis vByte labels
       ctx.setLineDash([2, 6]);
       ctx.lineWidth = 1;
+      ctx.font = "9px Geist Mono, monospace";
+      ctx.textAlign = "right";
       [0.25, 0.5, 0.75].forEach((level) => {
         const y = pt + (1 - level) * plotH;
         ctx.strokeStyle = `rgba(${rgb},0.07)`;
@@ -119,6 +121,10 @@ const charts = {
         ctx.moveTo(pl, y);
         ctx.lineTo(W - pr, y);
         ctx.stroke();
+        const labelVal = maxSize * level;
+        const labelTxt = labelVal > 1e6 ? (labelVal / 1e6).toFixed(1) + "M" : labelVal > 1e3 ? (labelVal / 1e3).toFixed(0) + "K" : labelVal.toFixed(0);
+        ctx.fillStyle = `rgba(${rgb},0.28)`;
+        ctx.fillText(labelTxt, W - pr - 2, y - 2);
       });
       ctx.setLineDash([]);
 
@@ -195,18 +201,24 @@ const charts = {
       setText("mp-min", "min " + fmt(minSize) + "B");
       setText("mp-max", "max " + fmt(maxSize) + "B");
       setText("mp-avg", "avg " + fmt(avgSize) + "B");
-      const phEl = $("mp-ph");
-      if (phEl) phEl.textContent = "mempool · " + n + " samples";
     },
   },
 
   blockTiming: {
     _blocks: [],
     _panel: null,
+    _lastGeom: null, // { gaps, bw, padX, H } — for hover hit-testing
+    _liveTimer: null,
 
     draw(blocks) {
       if (blocks?.length) this._blocks = blocks;
       this._measure();
+      // Start live tick if not already running
+      if (!this._liveTimer) {
+        this._liveTimer = setInterval(() => {
+          if (this._blocks.length && !document.hidden) this._measure();
+        }, 1000);
+      }
     },
 
     _measure() {
@@ -239,6 +251,7 @@ const charts = {
       }
 
       const accentRgb = getAccentRgb();
+      const amberRgb = (getComputedStyle(document.documentElement).getPropertyValue("--amber-rgb") || "230,160,40").trim();
 
       const gaps = [];
       for (let i = 0; i < blocks.length - 1; i++) {
@@ -273,6 +286,25 @@ const charts = {
       ctx.font = `${fontSize}px Geist Mono, monospace`;
       ctx.textAlign = "center";
 
+      // Subtle area fill — traces bar tops down to the chart floor
+      {
+        const areaGrad = ctx.createLinearGradient(0, 0, 0, H);
+        areaGrad.addColorStop(0, `rgba(${accentRgb},0.10)`);
+        areaGrad.addColorStop(1, `rgba(${accentRgb},0.01)`);
+        ctx.fillStyle = areaGrad;
+        ctx.beginPath();
+        ctx.moveTo(padX, H);
+        gaps.forEach(({ g }, i) => {
+          const barH = Math.max(2, Math.floor((g / maxG) * (H - 4)));
+          const x = padX + i * (bw + 1);
+          ctx.lineTo(x, H - barH);
+          ctx.lineTo(x + bw, H - barH);
+        });
+        ctx.lineTo(padX + (gaps.length - 1) * (bw + 1) + bw, H);
+        ctx.closePath();
+        ctx.fill();
+      }
+
       gaps.forEach(({ g, current }, i) => {
         const barH = Math.max(2, Math.floor((g / maxG) * (H - 4)));
         const x = padX + i * (bw + 1);
@@ -294,8 +326,8 @@ const charts = {
             barGrad.addColorStop(0, "rgba(90,170,106,.75)");
             barGrad.addColorStop(1, "rgba(90,170,106,.35)");
           } else if (slow) {
-            barGrad.addColorStop(0, "rgba(64,64,64,.6)");
-            barGrad.addColorStop(1, "rgba(40,40,40,.4)");
+            barGrad.addColorStop(0, `rgba(${amberRgb},.55)`);
+            barGrad.addColorStop(1, `rgba(${amberRgb},.22)`);
           } else {
             barGrad.addColorStop(0, `rgba(${accentRgb},0.65)`);
             barGrad.addColorStop(1, `rgba(${accentRgb},0.30)`);
@@ -359,6 +391,46 @@ const charts = {
       setText("bt-max", "max " + maxCompletedG.toFixed(1) + "m");
       setText("bt-avg", "avg " + avgG.toFixed(1) + "m");
       setText("bt-ph", "last " + completedVals.length + " blocks");
+
+      // Store geometry for hover hit-testing
+      this._lastGeom = { gaps, bw, padX, H };
+    },
+
+    _initHover() {
+      const canvas = $("bt-canvas");
+      const tip = $("bt-hover");
+      if (!canvas || !tip) return;
+
+      canvas.addEventListener("mousemove", (e) => {
+        const geom = this._lastGeom;
+        if (!geom || !geom.gaps.length) return;
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const { gaps, bw, padX } = geom;
+        const idx = Math.floor((mx - padX) / (bw + 1));
+        if (idx < 0 || idx >= gaps.length) { tip.classList.remove("visible"); return; }
+
+        const gap = gaps[idx];
+        // _blocks[0] = tip, so block for completed gap i = _blocks[gaps.length - 1 - idx] (approx)
+        const blockRef = !gap.current && this._blocks.length
+          ? this._blocks[gaps.length - 1 - idx] || null
+          : null;
+
+        const label = gap.g >= 10 ? Math.round(gap.g) + "m" : gap.g.toFixed(1) + "m";
+        tip.innerHTML = blockRef
+          ? `<span class="bt-iv">${label}</span><span class="bt-ht"> · #${fb(blockRef.height)}</span>`
+          : `<span class="bt-iv">${label}</span><span class="bt-ht"> · in progress</span>`;
+        tip.classList.add("visible");
+
+        const panel = this._panel || $("p-col2-mid");
+        const pr = panel ? panel.getBoundingClientRect() : rect;
+        let tipX = e.clientX - pr.left + 10;
+        if (tipX + 120 > pr.width) tipX = e.clientX - pr.left - tip.offsetWidth - 6;
+        tip.style.left = tipX + "px";
+        tip.style.top = (e.clientY - pr.top - tip.offsetHeight / 2) + "px";
+      });
+
+      canvas.addEventListener("mouseleave", () => tip.classList.remove("visible"));
     },
   },
 
@@ -388,6 +460,8 @@ const charts = {
       () => !!$("mp-canvas") && this.mempoolViz._history.some(h => h && h.size > 0));
     observe($("p-col2-mid"), this.blockTiming,
       () => this.blockTiming._blocks.length > 0);
+
+    this.blockTiming._initHover();
 
     const sparkPanel = $("p-col2-top");
     if (sparkPanel) {
