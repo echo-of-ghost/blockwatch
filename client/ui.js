@@ -1275,10 +1275,10 @@ const heroStrip = {
     const newHeight = bc.blocks || 0;
     if (this._lastHeight !== null && newHeight > this._lastHeight) {
       this._pulseHeightBar();
-      // Only chime for live blocks — suppress during IBD and catch-up after
-      // being offline (blocks older than 20 minutes are not live arrivals).
-      const tipTime = blocks.length ? blocks[0].time : 0;
-      if (now - tipTime < 1200) this._playBlockTick();
+      // Only chime when fully synced. blocks === headers means no known blocks
+      // are pending validation — catches the last 1-2 catch-up blocks that
+      // slip through once verificationprogress already reads >= 0.9999.
+      if (!bc.ibd && bc.blocks === bc.headers && (bc.verificationprogress || 0) >= 0.9999) this._playBlockTick();
     }
     this._lastHeight = newHeight;
     this._setVal("hero-height", fb(newHeight), true);
