@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.2.3] - 2026-04-05
 
 ### Fixed
-- **Block chime fires during IBD and offline catch-up**: Audio now only plays when the node is fully synced (`ibd: false` and `verificationprogress >= 0.9999`). Previously the chime fired on every block during initial sync or when coming back online after being offline, causing repeated rapid chiming.
+- **Block chime fires during IBD and offline catch-up**: Audio now only plays when fully synced — `ibd: false`, `blocks === headers`, and `verificationprogress >= 0.9999`. The `blocks === headers` check catches the final 1–2 catch-up blocks that slip through once `verificationprogress` already reads as complete.
 
 ## [2.2.2] - 2026-04-05
 
