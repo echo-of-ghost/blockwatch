@@ -1275,7 +1275,10 @@ const heroStrip = {
     const newHeight = bc.blocks || 0;
     if (this._lastHeight !== null && newHeight > this._lastHeight) {
       this._pulseHeightBar();
-      this._playBlockTick();
+      // Only chime for live blocks — suppress during IBD and catch-up after
+      // being offline (blocks older than 20 minutes are not live arrivals).
+      const tipTime = blocks.length ? blocks[0].time : 0;
+      if (now - tipTime < 1200) this._playBlockTick();
     }
     this._lastHeight = newHeight;
     this._setVal("hero-height", fb(newHeight), true);
