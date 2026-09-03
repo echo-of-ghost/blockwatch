@@ -49,6 +49,11 @@ Production-hardening release from a full server/client/Electron audit. Findings 
 - **One corner radius**: the design mixed 1px, 2px and 3px across 53 declarations, a difference invisible at this scale. All now use a single `--radius` token.
 - **Section labels share one treatment**: the node panel rendered them lowercase while every other panel used uppercase. All section labels are now uppercase at the same tracking, with `.sec` differing only by the divider rule it adds.
 
+### Security
+- **Electron 33 → 44, off end-of-life**: the packaged app shipped an unmaintained Chromium with known unpatched vulnerabilities. It now runs Electron 44.1.1 (Chromium 152). `electron-builder` moved 25.1.8 → 26.15.3 alongside it, which clears every outstanding advisory: `npm audit` goes from 14 vulnerabilities, one critical, to zero.
+- Building this requires Node 22 or newer. Electron's installer now calls `require()` on an ES-module-only `@electron/get`, which Node 18 cannot do, so on Node 18 the install silently completes without ever downloading the Electron binary. Node 18 is itself end-of-life as of April 2025.
+- Verified on Electron 44 against a live mainnet node: the preload bridge, sandbox isolation (`window.require` and `window.process` both undefined in the renderer), the terminal IPC round trip, and both IPC input guards all behave as they did on 33. `event.senderFrame` is now typed `WebFrameMain | null`, which the existing sender check handles correctly, since a null frame fails closed.
+
 ### Changed
 - `package-lock.json` is now committed; install with `npm ci` for reproducible builds.
 - Block headers' `nTx` is used for the transaction count when `getblockstats` is unavailable (IBD, pruned blocks); pruned blocks are flagged in block detail.

@@ -20,8 +20,8 @@
     "zeromq": "^6.5.0"
   },
   "devDependencies": {
-    "electron": "^33.4.11",
-    "electron-builder": "^25.1.8"
+    "electron": "^44.1.1",
+    "electron-builder": "^26.15.3"
   },
   "build": {
     "appId": "com.blockwatch.dashboard",
@@ -39,7 +39,14 @@
       "node_modules/**"
     ],
     "linux": {
-      "target": [{ "target": "AppImage", "arch": ["x64"] }],
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "category": "Finance"
     }
   },
