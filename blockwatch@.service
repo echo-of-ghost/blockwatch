@@ -22,6 +22,11 @@ ReadWritePaths=/home/%i/blockwatch
 # Optional environment variables
 # Environment=PORT=3000
 # Environment=HOST=127.0.0.1
+# Binding a non-loopback HOST requires remote mode (basic auth), otherwise
+# the server refuses to start:
+# Environment=BLOCKWATCH_REMOTE=1
+# Environment=BLOCKWATCH_USER=...
+# Environment=BLOCKWATCH_PASS=...
 # Environment=BITCOIN_RPC_HOST=127.0.0.1
 # Environment=BITCOIN_RPC_PORT=8332
 # Environment=BITCOIN_RPC_USER=...

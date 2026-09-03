@@ -1,6 +1,6 @@
 {
   "name": "blockwatch",
-  "version": "2.2.3",
+  "version": "2.2.4",
   "description": "Real-time Bitcoin node dashboard",
   "main": "electron/main.js",
   "scripts": {

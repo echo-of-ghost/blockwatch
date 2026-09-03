@@ -1,5 +1,6 @@
 const http = require("http"),
   fs = require("fs"),
+  net = require("net"),
   path = require("path"),
   os = require("os"),
   readline = require("readline"),
@@ -236,7 +237,14 @@ function tryCookie() {
 let _authCache = null,
   _authCacheAt = 0;
 const AUTH_TTL_MS = 5000;
+// Set once credentials come from the environment or an interactive prompt.
+// Explicit credentials always win over a cookie file that happens to exist.
+let _explicitCreds = false;
 function getAuth() {
+  if (_explicitCreds) {
+    if (!RPC_PORT) RPC_PORT = 8332;
+    return { user: RPC_USER, pass: RPC_PASS };
+  }
   const now = Date.now();
   if (_authCache && now - _authCacheAt < AUTH_TTL_MS) return _authCache;
   const cookie = tryCookie();
@@ -338,10 +346,24 @@ function printBanner() {
   process.stdout.write("  " + bar + "\n");
 }
 
+// Prompting only works with an interactive terminal. Under systemd, launchd or
+// a packaged AppImage stdin is not a TTY and readline would wait forever.
+function requireTTY(what) {
+  if (process.stdin.isTTY) return;
+  throw new Error(
+    what +
+      " required but stdin is not a TTY, so blockwatch cannot prompt. " +
+      "Set BITCOIN_COOKIE_FILE, or BITCOIN_RPC_USER and BITCOIN_RPC_PASS" +
+      (REMOTE_MODE ? ", and BLOCKWATCH_USER / BLOCKWATCH_PASS" : "") +
+      " in the environment.",
+  );
+}
+
 async function loadAuth() {
   // Remote dashboard credentials
   if (REMOTE_MODE) {
     if (!REMOTE_USER || !REMOTE_PASS) {
+      requireTTY("dashboard credentials");
       process.stdout.write("  " + c(A.pos, "! ") + c(A.t2, "remote mode — set dashboard credentials") + "\n\n");
       REMOTE_USER = await prompt("  " + c(A.t3, "dashboard user".padEnd(14)) + "  ");
       REMOTE_PASS = await prompt("  " + c(A.t3, "dashboard pass".padEnd(14)) + "  ", true);
@@ -354,6 +376,8 @@ async function loadAuth() {
   if (process.env.BITCOIN_RPC_USER && process.env.BITCOIN_RPC_PASS) {
     RPC_USER = process.env.BITCOIN_RPC_USER;
     RPC_PASS = process.env.BITCOIN_RPC_PASS;
+    _explicitCreds = true;
+    if (!RPC_PORT) RPC_PORT = 8332;
     row("auth", "env vars  " + c(A.t4, "(" + RPC_USER + ")"), A.grn);
     return;
   }
@@ -371,6 +395,7 @@ async function loadAuth() {
     row("network", net, cookie.port === 8332 ? A.t2 : A.pos);
     return;
   }
+  requireTTY("no RPC cookie found; RPC credentials");
   process.stdout.write(
     "  " +
       c(A.pos, "! ") +
@@ -379,6 +404,8 @@ async function loadAuth() {
   );
   RPC_USER = await prompt("  " + c(A.t3, "rpc user".padEnd(14)) + "  ");
   RPC_PASS = await prompt("  " + c(A.t3, "rpc pass".padEnd(14)) + "  ", true);
+  _explicitCreds = true;
+  if (!RPC_PORT) RPC_PORT = 8332;
   process.stdout.write("\n");
 }
 
@@ -397,7 +424,6 @@ function loadStaticFiles() {
     "charts.js",
     "ui.js",
     "panels/node.js",
-    "panels/fees.js",
     "panels/peers.js",
     "panels/mining.js",
     "panels/mempool.js",
@@ -466,6 +492,23 @@ function loadStaticFiles() {
       else if (!f.optional)
         console.error("[warn] could not preload " + f.path + ": " + e.message);
     }
+  }
+  // Cache-bust the assets index.html pulls in. index.html itself is no-store,
+  // but the scripts and stylesheet are cached for an hour, so after an upgrade
+  // a browser can pair new HTML with a stale module or stale styles. Stamp each
+  // URL with that file's own ETag; the static lookup ignores the query string.
+  const idx = _static["/index.html"];
+  if (idx) {
+    const stamp = (src) => {
+      const entry = _static["/" + src];
+      const v = entry ? entry.etag.replace(/"/g, "") : "";
+      return v ? src + "?v=" + v : src;
+    };
+    const html = idx.buf
+      .toString("utf8")
+      .replace(/(<script\s+src=")([^"?>]+\.js)(")/g, (m, pre, src, post) => pre + stamp(src) + post)
+      .replace(/(<link\b[^>]*\bhref=")([^"?>]+\.css)(")/g, (m, pre, src, post) => pre + stamp(src) + post);
+    idx.buf = Buffer.from(html, "utf8");
   }
 }
 loadStaticFiles();
@@ -554,18 +597,60 @@ let _state = null;
 // Active SSE response objects. Pruned on each broadcast.
 let _sseClients = [];
 
+// A client that stops reading (laptop asleep, half-open TCP) would otherwise
+// accumulate every broadcast in process memory until the kernel gives up on
+// the socket. Drop it once its unsent backlog exceeds this many bytes.
+const SSE_MAX_BUFFER =
+  parseInt(process.env.BLOCKWATCH_SSE_MAX_BUFFER || "0") || 8 * 1024 * 1024;
+
+function pruneSseClients() {
+  _sseClients = _sseClients.filter((r) => {
+    if (r.writableEnded || r.destroyed) return false;
+    if (r.writableLength > SSE_MAX_BUFFER) {
+      console.error(
+        "[sse] dropping stalled client with " + r.writableLength + " bytes unsent",
+      );
+      try {
+        r.destroy();
+      } catch (_) {}
+      return false;
+    }
+    return true;
+  });
+}
+
 function broadcast() {
   if (!_state) return;
+  _state.zmqMode = blockSource();
   const payload = "data: " + JSON.stringify(_state) + "\n\n";
-  _sseClients = _sseClients.filter((r) => !r.writableEnded);
+  pruneSseClients();
   for (const r of _sseClients) r.write(payload);
 }
 
 // SSE heartbeat — keeps proxies and load balancers from closing idle connections.
 setInterval(() => {
-  _sseClients = _sseClients.filter((r) => !r.writableEnded);
+  pruneSseClients();
   for (const r of _sseClients) r.write(": ping\n\n");
 }, 15000);
+
+// Valid getchaintxstats windows. Core requires 0 < nblocks < tip height.
+function txStatsWindow(blocks) {
+  return blocks >= 2 ? Math.min(2016, blocks - 1) : 0;
+}
+// Window covering only the current difficulty period (blocks since the last
+// retarget), so the client can estimate the next adjustment the way Core
+// computes it, rather than from a trailing window that spans the previous period.
+function retargetWindow(blocks) {
+  return blocks >= 2 ? Math.min(blocks % 2016, blocks - 1) : 0;
+}
+const chainTxStats = (blocks) => {
+  const w = txStatsWindow(blocks);
+  return w ? safe("getchaintxstats", [w]) : Promise.resolve(null);
+};
+const retargetStats = (blocks) => {
+  const w = retargetWindow(blocks);
+  return w ? safe("getchaintxstats", [w]) : Promise.resolve(null);
+};
 
 // Fields requested from getblockstats — extracted so initState and onNewBlock
 // always request exactly the same set.
@@ -584,13 +669,17 @@ const BLOCK_STATS_FIELDS = [
   "feerate_percentiles",
 ];
 
-function normalizeBlock(hash, hdr, st) {
+function normalizeBlock(hash, hdr, st, pruned = false) {
   hdr = hdr || {};
   st = st || {};
   return {
     height: hdr.height ?? 0,
     hash,
-    txs: st.txs ?? 0,
+    previousblockhash: hdr.previousblockhash ?? "",
+    // getblockheader carries nTx for free, so IBD (no getblockstats) and
+    // pruned blocks still show a transaction count.
+    txs: st.txs ?? hdr.nTx ?? 0,
+    pruned,
     size: st.total_size ?? 0,
     weight: st.total_weight ?? 0,
     time: hdr.time ?? st.time ?? 0,
@@ -651,15 +740,14 @@ async function initState() {
 
   const ibd = blockchain.initialblockdownload || false;
 
-  const [peerInfo, netTotals, uptime, deploymentInfo, chainTxStats, chainTips] =
+  const [peerInfo, netTotals, uptime, deploymentInfo, cts, rts, chainTips] =
     await Promise.all([
       safe("getpeerinfo"),
       safe("getnettotals"),
       safe("uptime"),
       safe("getdeploymentinfo"),
-      blockchain.blocks >= 1
-        ? safe("getchaintxstats", [Math.min(2016, blockchain.blocks)])
-        : Promise.resolve(null),
+      chainTxStats(blockchain.blocks),
+      retargetStats(blockchain.blocks),
       safe("getchaintips"),
     ]);
 
@@ -701,7 +789,8 @@ async function initState() {
     mempoolInfo: mempoolInfo || {},
     peers: Array.isArray(peerInfo) ? peerInfo : [],
     blocks,
-    chainTxStats: chainTxStats || {},
+    chainTxStats: cts || {},
+    retargetStats: rts || null,
     fees: normalizeFees(feeFast),
     netTotals: netTotals || {},
     uptime: uptime || 0,
@@ -714,7 +803,7 @@ async function initState() {
       : ni.warnings || "",
     ts: Date.now(),
     rpcNode: RPC_HOST + ":" + RPC_PORT,
-    zmqMode: _pollFallbackActive ? "poll" : "zmq",
+    zmqMode: blockSource(),
   };
 }
 
@@ -722,86 +811,182 @@ async function initState() {
 // Triggered by ZMQ hashblock or the poll fallback. Fetches only the new block
 // and a handful of summary calls — not the full 30-call batch.
 let _blockRefreshInFlight = false;
+let _blockRefreshPending = false;
 
+// Serialises tip refreshes. A trigger that arrives mid-refresh (ZMQ and the
+// tip watcher can both fire) is not dropped — it re-runs once the current
+// refresh finishes, so the state never lags behind a known-newer tip.
 async function onNewBlock() {
-  if (_blockRefreshInFlight) return;
+  if (_blockRefreshInFlight) {
+    _blockRefreshPending = true;
+    return;
+  }
   _blockRefreshInFlight = true;
   try {
-    if (!_state) return;
-
-    const bc = await safe("getblockchaininfo");
-    if (!bc) return;
-
-    if (_state.blockchain?.chain && bc.chain !== _state.blockchain.chain) {
-      await initState();
-      if (_state && !_state.error) broadcast();
-      return;
-    }
-
-    // Dedup: skip if we've already processed this height
-    const knownHeight = _state.blocks[0]?.height ?? -1;
-    if (bc.blocks <= knownHeight) return;
-
-    const ibd = bc.initialblockdownload || false;
-    const maxBlocks = ibd ? 8 : 24;
-
-    // Gap fill: if more than one block arrived since last update, fetch them all
-    const gap = bc.blocks - knownHeight;
-    const fetchCount = Math.min(gap, maxBlocks);
-    const heights = Array.from({ length: fetchCount }, (_, i) => bc.blocks - i);
-
-    const hashes = await Promise.all(heights.map(h => safe("getblockhash", [h])));
-
-    const [headers, stats, mi, cts] = await Promise.all([
-      Promise.all(hashes.map(h => h ? safe("getblockheader", [h, true]) : null)),
-      ibd
-        ? Promise.resolve(heights.map(() => null))
-        : Promise.all(hashes.map(h => h ? safe("getblockstats", [h, BLOCK_STATS_FIELDS]) : null)),
-      safe("getmempoolinfo"),
-      safe("getchaintxstats", [Math.min(2016, bc.blocks || 1)]),
-    ]);
-
-    const newBlocks = hashes
-      .map((hash, i) => hash && headers[i] ? normalizeBlock(hash, headers[i], stats[i]) : null)
-      .filter(Boolean);
-
-    // If the tip header failed, still update blockchain + mempool
-    if (!newBlocks.length) {
-      _state.blockchain = bc;
-      if (mi) _state.mempoolInfo = mi;
-      if (cts) _state.chainTxStats = cts;
-      delete _state.error;
-      _state.ts = Date.now();
-      broadcast();
-      return;
-    }
-
-    _state.blockchain = bc;
-    _state.blocks = [...newBlocks, ..._state.blocks].slice(0, maxBlocks);
-    if (mi) _state.mempoolInfo = mi;
-    if (cts) _state.chainTxStats = cts;
-    delete _state.error;
-    _state.ts = Date.now();
-
-    broadcast();
+    do {
+      _blockRefreshPending = false;
+      await refreshTip();
+    } while (_blockRefreshPending);
   } finally {
     _blockRefreshInFlight = false;
   }
+}
+
+// Fetch hash + header for `count` heights walking down from `from`.
+async function fetchHeaders(from, count) {
+  const heights = Array.from({ length: count }, (_, i) => from - i).filter(
+    (h) => h >= 0,
+  );
+  const hashes = await Promise.all(heights.map((h) => safe("getblockhash", [h])));
+  const headers = await Promise.all(
+    hashes.map((h) => (h ? safe("getblockheader", [h, true]) : null)),
+  );
+  return heights.map((height, i) => ({ height, hash: hashes[i], hdr: headers[i] }));
+}
+
+async function refreshTip() {
+  if (!_state) return;
+
+  const bc = await safe("getblockchaininfo");
+  if (!bc) return;
+
+  if (_state.blockchain?.chain && bc.chain !== _state.blockchain.chain) {
+    await initState();
+    if (_state && !_state.error) broadcast();
+    return;
+  }
+
+  // IBD just finished: the held blocks were fetched without getblockstats and
+  // the window was trimmed to 8. Rebuild the full snapshot so sizes, fees and
+  // the 24-block window come back immediately instead of refilling one block
+  // at a time over the next four hours.
+  if (_state.blockchain?.initialblockdownload && !bc.initialblockdownload) {
+    await initState();
+    if (_state && !_state.error) broadcast();
+    return;
+  }
+
+  // Dedup on the tip *hash*, not the height: a same-height reorg replaces the
+  // tip block without changing bc.blocks.
+  const known = _state.blocks[0];
+  const knownHeight = known?.height ?? -1;
+  if (known && bc.bestblockhash && bc.bestblockhash === known.hash) {
+    _state.blockchain = bc;
+    return;
+  }
+
+  const ibd = bc.initialblockdownload || false;
+  const maxBlocks = ibd ? 8 : 24;
+
+  // Gap fill: fetch every height we have not seen. A reorg to the same or a
+  // lower height still needs at least the new tip.
+  const gap = bc.blocks - knownHeight;
+  let fetched = await fetchHeaders(bc.blocks, Math.max(1, Math.min(gap, maxBlocks)));
+
+  // Reorg check: the lowest fetched header must link (previousblockhash) to
+  // the block we already hold directly beneath it. If it does not, the held
+  // block was orphaned — keep walking down until the chains join or we have
+  // replaced the whole window.
+  for (;;) {
+    const low = fetched[fetched.length - 1];
+    if (!low || !low.hdr || low.height === 0 || fetched.length >= maxBlocks) break;
+    const held = _state.blocks.find((b) => b.height === low.height - 1);
+    if (!held || held.hash === low.hdr.previousblockhash) break;
+    const more = await fetchHeaders(
+      low.height - 1,
+      Math.min(4, maxBlocks - fetched.length),
+    );
+    if (!more.length) break;
+    fetched = fetched.concat(more);
+  }
+
+  const pruneHeight = bc.pruned ? bc.pruneheight ?? 0 : 0;
+  const [stats, mi, cts, rts] = await Promise.all([
+    ibd
+      ? Promise.resolve(fetched.map(() => null))
+      : Promise.all(
+          fetched.map((f) =>
+            f.hash && f.height >= pruneHeight
+              ? safe("getblockstats", [f.hash, BLOCK_STATS_FIELDS])
+              : null,
+          ),
+        ),
+    safe("getmempoolinfo"),
+    chainTxStats(bc.blocks),
+    retargetStats(bc.blocks),
+  ]);
+
+  const newBlocks = fetched
+    .map((f, i) =>
+      f.hash && f.hdr
+        ? normalizeBlock(f.hash, f.hdr, stats[i], !ibd && !stats[i] && f.height < pruneHeight)
+        : null,
+    )
+    .filter(Boolean);
+
+  _state.blockchain = bc;
+  if (mi) _state.mempoolInfo = mi;
+  if (cts) _state.chainTxStats = cts;
+  _state.retargetStats = rts || null;
+  delete _state.error;
+  _state.ts = Date.now();
+
+  // If the tip header failed, still publish blockchain + mempool.
+  if (!newBlocks.length) {
+    broadcast();
+    return;
+  }
+
+  const lowestNew = newBlocks[newBlocks.length - 1].height;
+  const replaced = _state.blocks.filter(
+    (b) =>
+      b.height >= lowestNew &&
+      !newBlocks.some((n) => n.height === b.height && n.hash === b.hash),
+  );
+  if (replaced.length) {
+    console.error(
+      "[reorg] " +
+        replaced.length +
+        " block(s) replaced from height " +
+        replaced[replaced.length - 1].height +
+        " (old tip " +
+        (known ? known.hash.slice(0, 12) : "?") +
+        " → new tip " +
+        bc.bestblockhash.slice(0, 12) +
+        ")",
+    );
+  }
+  _state.blocks = [
+    ...newBlocks,
+    ..._state.blocks.filter((b) => b.height < lowestNew),
+  ].slice(0, maxBlocks);
+
+  broadcast();
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ZMQ INTEGRATION
 // ═══════════════════════════════════════════════════════════════════════════════
 
-let _pollFallbackActive = false;
+let _pollFallbackActive = false; // zeromq module missing or socket failed
+let _zmqConnected = false; // transport-level connect event seen
+let _zmqSeen = false; // at least one hashblock message received
 let _zmqSocket = null;
+
+// What is actually delivering block events right now. ZMQ connect() never
+// fails (it retries in the background forever), so "zmq" is only claimed once
+// the socket has connected or a message has arrived; until then the tip
+// watcher below is doing the work and we say so.
+function blockSource() {
+  return !_pollFallbackActive && (_zmqConnected || _zmqSeen) ? "zmq" : "poll";
+}
 
 async function initZmq() {
   let Subscriber;
   try {
     ({ Subscriber } = require("zeromq"));
   } catch (_) {
-    row("zmq", "module not found — falling back to polling", A.pos);
+    row("zmq", "module not found — using 10s polling", A.pos);
     startPollFallback();
     return;
   }
@@ -809,12 +994,24 @@ async function initZmq() {
   try {
     const sock = new Subscriber();
     _zmqSocket = sock;
+    // Transport events let us report an honest block source and notice when
+    // bitcoind goes away (the tip watcher keeps blocks flowing meanwhile).
+    try {
+      sock.events.on("connect", () => {
+        _zmqConnected = true;
+      });
+      sock.events.on("disconnect", () => {
+        _zmqConnected = false;
+        _zmqSeen = false;
+      });
+    } catch (_) {}
     sock.connect(`tcp://${ZMQ_HOST}:${ZMQ_PORT}`);
     sock.subscribe("hashblock");
-    row("zmq", `tcp://${ZMQ_HOST}:${ZMQ_PORT}`, A.grn);
+    row("zmq", `tcp://${ZMQ_HOST}:${ZMQ_PORT}` + c(A.t4, "  (10s poll safety net always on)"), A.grn);
 
     for await (const [topicBuf] of sock) {
       if (topicBuf.toString() !== "hashblock") continue;
+      _zmqSeen = true;
       try {
         await onNewBlock();
       } catch (e) {
@@ -823,54 +1020,53 @@ async function initZmq() {
     }
   } catch (e) {
     _zmqSocket = null;
-    row("zmq", "error: " + e.message + " — falling back to polling", A.pos);
+    row("zmq", "error: " + e.message + " — using 10s polling", A.pos);
     startPollFallback();
   }
 }
 
-// ── Chain watcher — detects node switches regardless of ZMQ state ─────────────
-// Runs always alongside ZMQ. One cheap getblockchaininfo every 10s is enough
-// to catch a chain change within 10s, matching the pre-ZMQ behaviour.
-function startChainWatcher() {
+// ── Tip watcher — always runs, regardless of ZMQ state ────────────────────────
+// One cheap getblockchaininfo every 10s. It (a) detects a node/chain switch,
+// (b) refreshes headers/verificationprogress/warnings between blocks, and
+// (c) is the safety net for new blocks when ZMQ is misconfigured, disconnected
+// or simply not enabled in bitcoin.conf — ZMQ only makes delivery faster.
+let _tipWatchInFlight = false;
+function startTipWatcher() {
   setInterval(async () => {
-    if (!_state || _state.error) return;
-    const bc = await safe("getblockchaininfo");
-    if (!bc || !_state.blockchain?.chain) return;
-    if (bc.chain !== _state.blockchain.chain) {
-      await initState();
-      if (_state && !_state.error) broadcast();
+    if (!_state || _state.error || _tipWatchInFlight) return;
+    _tipWatchInFlight = true;
+    try {
+      const bc = await safe("getblockchaininfo");
+      if (!bc || !_state.blockchain?.chain) return;
+      if (bc.chain !== _state.blockchain.chain) {
+        // Chain switched — full re-init so blocks, peers, fees all reset cleanly.
+        await initState();
+        if (_state && !_state.error) broadcast();
+        return;
+      }
+      // New tip, or IBD just finished (which needs the full snapshot rebuilt).
+      // Hand both to refreshTip rather than overwriting _state.blockchain here,
+      // which would swallow the transition.
+      if (
+        (bc.bestblockhash && bc.bestblockhash !== _state.blocks[0]?.hash) ||
+        (_state.blockchain?.initialblockdownload && !bc.initialblockdownload)
+      ) {
+        await onNewBlock();
+        return;
+      }
+      // No new block — keep chain state fresh; the 5s fast refresh broadcasts it.
+      _state.blockchain = bc;
+    } finally {
+      _tipWatchInFlight = false;
     }
   }, 10000);
 }
 
-// ── Poll fallback — used when ZMQ is unavailable ──────────────────────────────
-// Checks for new blocks every 10s. If the node is mid-IBD this also provides
-// the regular blockchain-state updates that ZMQ alone doesn't cover.
+// ── Poll fallback — ZMQ unavailable; the tip watcher is the only block source ─
 function startPollFallback() {
   if (_pollFallbackActive) return;
   _pollFallbackActive = true;
-  if (_state) { _state.zmqMode = "poll"; broadcast(); }
-
-  setInterval(async () => {
-    if (!_state) return;
-    const bc = await safe("getblockchaininfo");
-    if (!bc) return;
-    if (_state.blockchain?.chain && bc.chain !== _state.blockchain.chain) {
-      // Chain switched — full re-init so blocks, peers, fees all reset cleanly.
-      await initState();
-      if (_state && !_state.error) broadcast();
-      return;
-    }
-    if (bc.blocks > (_state.blocks[0]?.height ?? -1)) {
-      // New block found — do the full per-block refresh.
-      await onNewBlock();
-    } else {
-      // No new block — still update blockchain state so stale indicators stay fresh.
-      _state.blockchain = bc;
-      _state.ts = Date.now();
-      broadcast();
-    }
-  }, 10000);
+  if (_state) broadcast();
 }
 
 // ── Fast refresh — bandwidth + mempool every 5s ───────────────────────────────
@@ -972,24 +1168,99 @@ function startDeploymentRefresh() {
 // HTTP SERVER
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const server = http.createServer(async (req, res) => {
+// Host header must name this machine in local mode. Without this, DNS
+// rebinding (attacker.com → 127.0.0.1) lets any website read the SSE stream
+// and /api/data as same-origin GETs, which carry no Origin header.
+function isLocalHostHeader(host) {
+  if (!host) return false;
+  const h = host.toLowerCase().replace(/:\d+$/, "");
+  return h === "localhost" || h === "127.0.0.1" || h === "[::1]";
+}
+
+// Origin, when a browser sends one, must match the Host the request arrived
+// on. Applies in both modes: in remote mode browsers attach cached Basic
+// credentials to cross-site requests, so auth alone is not a CSRF defence.
+function originMatchesHost(req) {
+  const origin = req.headers.origin;
+  if (origin == null) return true; // same-origin GET / non-browser client
+  if (origin === "null") return false;
+  try {
+    return new URL(origin).host.toLowerCase() === String(req.headers.host || "").toLowerCase();
+  } catch (_) {
+    return false;
+  }
+}
+
+// Parameter shapes accepted by /api/rpc. The allowlisted methods are
+// privileged (they change the node's peer set or cost minutes of I/O), so the
+// arguments are pinned to exactly what the dashboard needs.
+function isBanTarget(s) {
+  if (typeof s !== "string" || s.length > 64) return false;
+  const [ip, prefix, extra] = s.split("/");
+  if (extra !== undefined) return false;
+  const fam = net.isIP(ip);
+  if (!fam) return false;
+  if (prefix === undefined) return true;
+  if (!/^\d{1,3}$/.test(prefix)) return false;
+  const n = +prefix;
+  // No wildcard-sized bans through the dashboard proxy.
+  return fam === 4 ? n >= 16 && n <= 32 : n >= 32 && n <= 128;
+}
+const RPC_PARAM_RULES = {
+  listbanned: (p) => p.length === 0,
+  gettxoutsetinfo: (p) => p.length === 0,
+  disconnectnode: (p) =>
+    (p.length === 1 && typeof p[0] === "string" && p[0].length > 0 && p[0].length <= 300) ||
+    (p.length === 2 && p[0] === "" && Number.isInteger(p[1]) && p[1] >= 0),
+  setban: (p) => {
+    if (p.length < 2 || p.length > 4 || !isBanTarget(p[0])) return false;
+    if (p[1] === "remove") return p.length === 2;
+    if (p[1] !== "add") return false;
+    if (p.length >= 3 && !(Number.isInteger(p[2]) && p[2] >= 0)) return false;
+    if (p.length === 4 && typeof p[3] !== "boolean") return false;
+    return true;
+  },
+};
+let _utxoScanInFlight = false;
+
+// Nothing in the request handler may reject: an unhandled rejection is
+// treated as fatal by the process-level handler below, so a single malformed
+// request-target (new URL() throws on e.g. "GET http://[::1 HTTP/1.1") would
+// take the whole server down — before authentication.
+const server = http.createServer((req, res) => {
+  handleRequest(req, res).catch((e) => {
+    const bad = e && e.code === "ERR_INVALID_URL";
+    if (!bad) console.error("[http]", e && e.stack ? e.stack : e);
+    try {
+      if (!res.headersSent)
+        res.writeHead(bad ? 400 : 500, { "Content-Type": "text/plain" });
+      res.end(bad ? "bad request" : "internal error");
+    } catch (_) {
+      try {
+        req.socket.destroy();
+      } catch (_) {}
+    }
+  });
+});
+
+async function handleRequest(req, res) {
   const url = new URL(req.url, "http://localhost");
 
   // Remote mode: basic auth gates all requests. Check before anything else.
   if (!checkRemoteAuth(req, res)) return;
 
-  const origin = req.headers.origin || "";
-  // CSRF defence (local mode only): browsers always send an Origin header on
-  // cross-origin requests. In remote mode, basic auth is the protection layer.
-  if (!REMOTE_MODE && origin && !origin.match(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/)) {
-    res.writeHead(403);
-    res.end("forbidden");
+  if (!REMOTE_MODE && !isLocalHostHeader(req.headers.host)) {
+    res.writeHead(403, { "Content-Type": "text/plain" });
+    res.end("forbidden: unexpected Host header");
     return;
   }
-  // Security headers on every response
-  res.setHeader("Access-Control-Allow-Origin", origin || "http://localhost");
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  if (!originMatchesHost(req)) {
+    res.writeHead(403, { "Content-Type": "text/plain" });
+    res.end("forbidden: cross-origin request");
+    return;
+  }
+  // Security headers on every response. No CORS headers: the dashboard is
+  // strictly same-origin, so nothing legitimate needs a cross-origin read.
   res.setHeader(
     "Content-Security-Policy",
     "default-src 'self'; " +
@@ -1033,7 +1304,7 @@ const server = http.createServer(async (req, res) => {
             ? +(bc.verificationprogress * 100).toFixed(3)
             : null,
         headers: bc.headers ?? null,
-        blockSource: _pollFallbackActive ? "poll" : "zmq",
+        blockSource: blockSource(),
         ts: Date.now(),
       };
     } catch (e) {
@@ -1054,6 +1325,12 @@ const server = http.createServer(async (req, res) => {
       // Instruct nginx/caddy not to buffer the stream
       "X-Accel-Buffering": "no",
     });
+    // Detect dead peers (sleeping laptops, dropped links) instead of holding
+    // the socket — and its growing write backlog — until the kernel gives up.
+    try {
+      req.socket.setKeepAlive(true, 30000);
+      req.socket.setNoDelay(true);
+    } catch (_) {}
     // Flush headers immediately so the browser considers the connection open
     res.write("\n");
 
@@ -1086,13 +1363,15 @@ const server = http.createServer(async (req, res) => {
     }
     try {
       const hash = await rpc("getblockhash", [height]);
+      const bc = _state?.blockchain || {};
+      const pruned = !!bc.pruned && height < (bc.pruneheight ?? 0);
       const [hdr, st] = await Promise.all([
         safe("getblockheader", [hash, true]),
-        safe("getblockstats", [hash, BLOCK_STATS_FIELDS]),
+        pruned ? null : safe("getblockstats", [hash, BLOCK_STATS_FIELDS]),
       ]);
       if (!hdr) throw new Error("block not found");
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify(normalizeBlock(hash, hdr, st)));
+      res.end(JSON.stringify(normalizeBlock(hash, hdr, st, pruned || (!st && !!bc.pruned))));
     } catch (e) {
       res.writeHead(404, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: e.message }));
@@ -1124,6 +1403,14 @@ const server = http.createServer(async (req, res) => {
         return;
       }
     }
+    // A JSON content type cannot be produced by an HTML form, which closes the
+    // text/plain CSRF route; the dashboard's fetch() always sends it.
+    const ctype = String(req.headers["content-type"] || "").split(";")[0].trim().toLowerCase();
+    if (ctype !== "application/json") {
+      res.writeHead(415, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "content-type must be application/json" }));
+      return;
+    }
     let body = "",
       done = false;
     req.on("data", (chunk) => {
@@ -1140,22 +1427,38 @@ const server = http.createServer(async (req, res) => {
       done = true;
       let result,
         status = 200,
-        rpcMethod = null;
+        rpcMethod = null,
+        utxoScan = false;
       try {
-        const { method, params } = JSON.parse(body);
-        const ALLOWED_METHODS = new Set([
-          "disconnectnode",
-          "setban",
-          "listbanned",
-          "gettxoutsetinfo",
-        ]);
-        if (!ALLOWED_METHODS.has(method))
+        const parsed = JSON.parse(body);
+        const method = parsed && parsed.method;
+        const params = parsed && parsed.params != null ? parsed.params : [];
+        const rule = Object.prototype.hasOwnProperty.call(RPC_PARAM_RULES, method)
+          ? RPC_PARAM_RULES[method]
+          : null;
+        if (!rule) {
+          status = 403;
           throw new Error("method not allowed: " + method);
-        result = { result: await rpc(method, params || []) };
+        }
+        if (!Array.isArray(params) || !rule(params)) {
+          status = 400;
+          throw new Error("invalid params for " + method);
+        }
+        if (method === "gettxoutsetinfo") {
+          // Minutes of CPU/disk on the node — never run two at once.
+          if (_utxoScanInFlight) {
+            status = 409;
+            throw new Error("gettxoutsetinfo already running");
+          }
+          _utxoScanInFlight = utxoScan = true;
+        }
+        result = { result: await rpc(method, params) };
         rpcMethod = method;
       } catch (e) {
         result = { error: e.message };
-        status = 500;
+        if (status === 200) status = 500;
+      } finally {
+        if (utxoScan) _utxoScanInFlight = false;
       }
 
       // Send response immediately
@@ -1226,7 +1529,7 @@ const server = http.createServer(async (req, res) => {
 
   res.writeHead(404);
   res.end("not found");
-});
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // STARTUP
@@ -1234,6 +1537,14 @@ const server = http.createServer(async (req, res) => {
 
 async function start() {
   printBanner();
+  if (!REMOTE_MODE && !["127.0.0.1", "localhost", "::1"].includes(SERVER_HOST)) {
+    throw new Error(
+      "HOST=" +
+        SERVER_HOST +
+        " would expose the dashboard on a non-loopback interface with no authentication. " +
+        "Set BLOCKWATCH_REMOTE=1 (enables basic auth) or use HOST=127.0.0.1.",
+    );
+  }
   await loadAuth();
 
   // Build the initial state snapshot before accepting connections so the first
@@ -1252,9 +1563,16 @@ async function start() {
   startFastRefresh();
   startSparseRefresh();
   startDeploymentRefresh();
-  startChainWatcher();
+  startTipWatcher();
 
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
+    server.once("error", (e) =>
+      reject(
+        new Error(
+          "cannot listen on " + SERVER_HOST + ":" + SERVER_PORT + ": " + e.message,
+        ),
+      ),
+    );
     server.listen(SERVER_PORT, SERVER_HOST, () => {
       row("node", RPC_HOST + ":" + RPC_PORT);
       const bar = c(A.t4, "-".repeat(Math.min(W - 4, 38)));
@@ -1282,7 +1600,10 @@ async function start() {
 }
 
 if (require.main === module) {
-  start().catch((e) => { console.error(e); process.exit(1); });
+  start().catch((e) => {
+    console.error("[blockwatch] " + (e && e.message ? e.message : e));
+    process.exit(1);
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1291,14 +1612,15 @@ if (require.main === module) {
 
 // SIGTERM: sent by systemd, Docker, Umbrel on stop/restart/update
 // SIGINT:  sent by Ctrl+C in a terminal
+// Crash paths exit non-zero so systemd's Restart=on-failure actually restarts.
 let _shuttingDown = false;
-function shutdown() {
+function shutdown(code = 0) {
   if (_shuttingDown) return;
   _shuttingDown = true;
   // Drain in-flight SSE writes before exiting. Give up to 5s.
   const force = setTimeout(() => {
     console.error("[blockwatch] shutdown timeout — forcing exit");
-    process.exit(1);
+    process.exit(code || 1);
   }, 5000);
   if (_zmqSocket) { try { _zmqSocket.close(); } catch (_) {} _zmqSocket = null; }
   _sseClients.forEach((r) => { try { r.destroy(); } catch (_) {} });
@@ -1306,18 +1628,18 @@ function shutdown() {
   server.close(() => {
     _rpcAgent.destroy();
     clearTimeout(force);
-    process.exit(0);
+    process.exit(code);
   });
 }
-process.on("SIGTERM", shutdown);
-process.on("SIGINT", shutdown);
+process.on("SIGTERM", () => shutdown(0));
+process.on("SIGINT", () => shutdown(0));
 process.on("unhandledRejection", (reason) => {
   console.error("[unhandled rejection]", reason);
-  shutdown();
+  shutdown(1);
 });
 process.on("uncaughtException", (err) => {
   console.error("[uncaught exception]", err);
-  shutdown();
+  shutdown(1);
 });
 
 // stop() — same as shutdown() but resolves a Promise instead of calling

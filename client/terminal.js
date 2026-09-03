@@ -11,6 +11,7 @@ const terminalDrawer = (() => {
   const _history = [];
   let _histIdx = -1;
   let _draft = '';
+  const MAX_ENTRIES = 200;
 
   // ── DOM refs ──────────────────────────────────────────────────────────────
   const _el     = () => document.getElementById('terminal-drawer');
@@ -72,6 +73,9 @@ const terminalDrawer = (() => {
       '<div class="term-result' + (isError ? ' term-result-err' : '') + '">' +
       content + '</div>';
     out.appendChild(entry);
+    // Bound the scrollback — large outputs (getrawmempool, getpeerinfo) would
+    // otherwise accumulate in the DOM for the life of the window.
+    while (out.childElementCount > MAX_ENTRIES) out.removeChild(out.firstElementChild);
     out.scrollTop = out.scrollHeight;
   }
 

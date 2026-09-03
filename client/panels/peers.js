@@ -134,6 +134,8 @@ const peersPanel = {
     if (this._selectedId != null) {
       const p = this._cache.find((x) => x.id === this._selectedId);
       if (p) this.renderDetail(p);
+    } else {
+      this.renderOverview();
     }
   },
 
@@ -161,16 +163,131 @@ const peersPanel = {
     }
   },
 
+  // With no peer selected the detail panel is the largest single area on the
+  // dashboard, so it shows an overview of the peer set rather than a
+  // placeholder. Everything here comes from _cache — no extra RPC calls.
+  _overviewSig: null,
+
+  renderOverview() {
+    const body = $("peer-detail-body");
+    if (!body) return;
+    const peers = this._cache || [];
+    setText("pd-ph", peers.length ? peers.length + " peers" : "—");
+
+    if (!peers.length) {
+      const empty = '<div class="pd-empty">no peers connected</div>';
+      if (this._overviewSig !== "empty") { this._overviewSig = "empty"; body.innerHTML = empty; }
+      return;
+    }
+
+    const inb = peers.filter((p) => p.inbound).length;
+    const out = peers.length - inb;
+
+    // Network mix, ordered like the node panel's reachability pills
+    const ORDER = ["ipv4", "ipv6", "onion", "i2p", "cjdns"];
+    const byNet = {};
+    peers.forEach((p) => {
+      const n = utils.peerNet(p.addr || "", p.network || "");
+      byNet[n] = (byNet[n] || 0) + 1;
+    });
+    const nets = Object.entries(byNet).sort(
+      (a, b) => (ORDER.indexOf(a[0]) < 0 ? 99 : ORDER.indexOf(a[0])) - (ORDER.indexOf(b[0]) < 0 ? 99 : ORDER.indexOf(b[0])),
+    );
+    const netCls = (n) =>
+      n === "onion" ? "peer-badge-onion" : n === "ipv6" ? "peer-badge-ipv6" : n === "i2p" ? "peer-badge-i2p" : "peer-badge-ipv4";
+    const netBar = nets
+      .map(([n, c]) => `<div class="pv-net-seg ${netCls(n)}" style="flex:${c}" title="${esc(n)}: ${c}"></div>`)
+      .join("");
+    const netKeys = nets
+      .map(([n, c]) => `<span class="pv-net-key"><span class="peer-badge ${netCls(n)}">${esc(n.toUpperCase())}</span>${c}</span>`)
+      .join("");
+
+    // Ping spread across peers that have answered a ping
+    const pings = peers.map((p) => p.pingtime).filter((v) => v > 0).sort((a, b) => a - b);
+    const ms = (v) => Math.round(v * 1000) + "ms";
+    const median = pings.length ? pings[Math.floor(pings.length / 2)] : null;
+
+    // Most common user agent
+    const byVer = {};
+    peers.forEach((p) => {
+      const v = (p.subver || "").replace(/^\/|\/$/g, "");
+      if (v) byVer[v] = (byVer[v] || 0) + 1;
+    });
+    const vers = Object.entries(byVer).sort((a, b) => b[1] - a[1]).slice(0, 4);
+
+    const totalSent = peers.reduce((a, p) => a + (p.bytessent || 0), 0);
+    const totalRecv = peers.reduce((a, p) => a + (p.bytesrecv || 0), 0);
+    const bwTotal = totalSent + totalRecv;
+    const sentPct = bwTotal > 0 ? ((totalSent / bwTotal) * 100).toFixed(1) : "50";
+    const recvPct = bwTotal > 0 ? ((totalRecv / bwTotal) * 100).toFixed(1) : "50";
+
+    const v2 = peers.filter((p) => (p.transport_protocol_type || "").includes("v2")).length;
+    const relaying = peers.filter((p) => p.relaytxes !== false).length;
+
+    const html = `
+      <div class="pd-hero">
+        <div class="pd-hero-item">
+          <span class="pd-hero-val">${peers.length}</span>
+          <span class="pd-hero-lbl">connected · ${inb} in / ${out} out</span>
+        </div>
+        <div class="pd-hero-item">
+          <span class="pd-hero-val ${median != null && median < 0.06 ? "grn" : "dim"}">${median != null ? ms(median) : "—"}</span>
+          <span class="pd-hero-lbl">median ping${pings.length ? " · " + ms(pings[0]) + "–" + ms(pings[pings.length - 1]) : ""}</span>
+        </div>
+      </div>
+
+      <div class="pd-bw-section">
+        <div class="pd-bw-track">
+          <div class="pd-bw-bar-sent" style="width:${sentPct}%"></div>
+          <div class="pd-bw-bar-recv" style="width:${recvPct}%"></div>
+        </div>
+        <div class="pd-bw-labels">
+          <span class="pd-bw-lbl-sent">↑ ${utils.fmtBytes(totalSent)}</span>
+          <span class="pd-bw-lbl-recv">↓ ${utils.fmtBytes(totalRecv)}</span>
+        </div>
+      </div>
+
+      <div class="pd-body">
+        <div class="pd-section">
+          <div class="pd-section-label">network mix</div>
+          <div class="pv-net-bar">${netBar}</div>
+          <div class="pv-net-keys">${netKeys}</div>
+        </div>
+        <div class="pd-section">
+          <div class="pd-section-label">user agents</div>
+          ${vers
+            .map(
+              ([v, c]) =>
+                `<div class="pd-kv"><span class="k">${esc(v)}</span><span class="v dim">${c}</span></div>`,
+            )
+            .join("") || '<div class="pd-kv"><span class="k">unknown</span><span class="v dim">—</span></div>'}
+        </div>
+        <div class="pd-section">
+          <div class="pd-section-label">transport</div>
+          <div class="pd-kv"><span class="k">v2 encrypted</span><span class="v ${v2 ? "grn" : "dim"}">${v2} / ${peers.length}</span></div>
+          <div class="pd-kv"><span class="k">relaying txs</span><span class="v dim">${relaying} / ${peers.length}</span></div>
+        </div>
+        <div class="pd-section">
+          <div class="pd-hint">select a peer for full detail</div>
+        </div>
+      </div>`;
+
+    const sig = peers.length + "|" + inb + "|" + JSON.stringify(nets) + "|" + (median || 0) + "|" + v2 + "|" + relaying + "|" + Math.round(bwTotal / 1e6);
+    if (sig === this._overviewSig) return;
+    this._overviewSig = sig;
+    body.innerHTML = html;
+    this._renderedPeerId = null;
+  },
+
   renderDetail(p) {
     const body = $("peer-detail-body");
 
     if (!p) {
-      if (body)
-        body.innerHTML = '<div class="pd-empty">click a peer to inspect</div>';
-      setText("pd-ph", "—");
       this._renderedPeerId = null;
+      this.renderOverview();
       return;
     }
+    this._overviewSig = null;
 
     // Same peer already rendered — patch values in-place, no DOM rebuild
     if (this._renderedPeerId === p.id && body?.querySelector("[data-pd]")) {
@@ -334,6 +451,18 @@ const peersPanel = {
         </div>
       </div>`;
 
+    // setban only accepts IP literals / subnets; onion, i2p and cjdns peers
+    // cannot be banned by address, so do not offer a button that always fails.
+    const canBan = net === "ipv4" || net === "ipv6";
+    const banButtons = canBan
+      ? `
+            <button type="button" class="pa-btn pa-ban" data-pa="ban1h">ban 1h</button>
+            <button type="button" class="pa-btn pa-ban" data-pa="ban24h">ban 24h</button>
+            <button type="button" class="pa-btn pa-ban" data-pa="ban7d">ban 7d</button>
+            <button type="button" class="pa-btn pa-ban" data-pa="ban30d">ban 30d</button>
+            <button type="button" class="pa-btn pa-ban" data-pa="banperm">ban ∞</button>`
+      : "";
+
     const sections = `
       <div class="pd-body">
         <div class="pd-section">
@@ -370,12 +499,7 @@ const peersPanel = {
         <div class="pd-section">
           <div class="pd-section-label">actions</div>
           <div class="peer-actions">
-            <button type="button" class="pa-btn" data-pa="disconnect">disconnect</button>
-            <button type="button" class="pa-btn pa-ban" data-pa="ban1h">ban 1h</button>
-            <button type="button" class="pa-btn pa-ban" data-pa="ban24h">ban 24h</button>
-            <button type="button" class="pa-btn pa-ban" data-pa="ban7d">ban 7d</button>
-            <button type="button" class="pa-btn pa-ban" data-pa="ban30d">ban 30d</button>
-            <button type="button" class="pa-btn pa-ban" data-pa="banperm">ban ∞</button>
+            <button type="button" class="pa-btn" data-pa="disconnect">disconnect</button>${banButtons}
           </div>
         </div>
       </div>`;
@@ -439,7 +563,9 @@ const peersPanel = {
           if (action === "disconnect") {
             btn.classList.add("pa-working");
             try {
-              await this.rpc("disconnectnode", [p.addr || ""]);
+              // Disconnect by node id — unambiguous even when several
+              // connections share an address string.
+              await this.rpc("disconnectnode", Number.isInteger(p.id) ? ["", p.id] : [p.addr || ""]);
               this._selectedId = null;
               this.renderDetail(null);
               setTimeout(() => poller.fetchNow(), 600);
@@ -512,10 +638,11 @@ const peersPanel = {
     if (p) {
       this.renderDetail(p);
     } else {
-      const body = $("peer-detail-body");
-      if (body) body.innerHTML = '<div class="pd-empty">peer disconnected</div>';
-      setText("pd-ph", "—");
+      // Peer went away between render and click — fall back to the overview
+      // rather than leaving the panel empty.
+      this._selectedId = null;
       this._renderedPeerId = null;
+      this.renderOverview();
     }
   },
 

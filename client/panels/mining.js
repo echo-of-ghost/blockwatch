@@ -53,8 +53,8 @@ const blocksPanel = {
         <td class="td-dim">${fb(b.txs)}</td>
         <td class="td-fill">
           <div class="blk-fill-wrap">
-            <div class="blk-fill-track"><div class="blk-fill-bar" style="width:${Math.min(fillPct, 100).toFixed(1)}%;background:${clr}"></div></div>
-            <span class="blk-fill-pct">${fillPct ? fillPct.toFixed(0) + "%" : "—"}</span>
+            <div class="blk-fill-track"><div class="blk-fill-bar" style="width:${fillPct > 0 ? Math.max(1.5, Math.min(fillPct, 100)).toFixed(1) : 0}%;background:${clr}"></div></div>
+            <span class="blk-fill-pct">${fillPct ? fillPct.toFixed(0) + "%" : b.txs === 1 ? "0%" : "—"}</span>
           </div>
         </td>
         <td class="td-dim">${b.time ? utils.fmtAge(now - b.time) : "—"}</td>
@@ -73,9 +73,16 @@ const blocksPanel = {
       this._initialised = true;
       this._selectedHeight = blocks[0].height;
       this.renderDetail(blocks[0]);
+    } else if (this._selectedHeight != null) {
+      // The user drives the detail panel, except when the block it shows was
+      // reorged out: same height, different hash — re-render so the detail
+      // never describes an orphaned block as if it were on the active chain.
+      const sel = blocks.find((x) => x.height === this._selectedHeight);
+      if (sel && this._selectedHash && sel.hash !== this._selectedHash) this.renderDetail(sel);
     }
-    // Subsequent polls leave the detail panel untouched — the user drives it.
   },
+
+  _selectedHash: null,
 
   renderDetail(b) {
     const el = $("block-detail-body");
@@ -84,9 +91,11 @@ const blocksPanel = {
     if (!b) {
       if (el) el.innerHTML = '<div class="pd-empty">—</div>';
       if (ph) ph.textContent = "latest";
+      this._selectedHash = null;
       return;
     }
 
+    this._selectedHash = b.hash || null;
     if (ph) ph.textContent = "#" + fb(b.height);
     const now = Date.now() / 1000;
 
@@ -110,8 +119,9 @@ const blocksPanel = {
 
     const avgfeeStr = (() => {
       if (b.avgfeerate >= 1) return f(b.avgfeerate, 0) + " sat/vB";
-      if (b.totalfee > 0 && b.size > 0)
-        return f(b.totalfee / b.size, 2) + " sat/vB";
+      // vbytes = weight / 4; dividing by raw size would give sat/byte.
+      if (b.totalfee > 0 && b.weight > 0)
+        return f(b.totalfee / (b.weight / 4), 2) + " sat/vB";
       return "—";
     })();
     const avgFeeCls = b.avgfeerate > 20 ? "o" : b.avgfeerate > 5 ? "o2" : "g";
@@ -156,16 +166,20 @@ const blocksPanel = {
       if (!p || p.length < 5) return "";
       const vals = [p[0], p[1], p[2], p[3], p[4]];
       const max = Math.max(...vals, 1);
+      const min = Math.min(...vals);
       const fmt = (v) => (v >= 1 ? String(Math.round(v)) : v.toFixed(1));
+      // When every percentile is equal the bars encode nothing, and a scaled
+      // chart would imply a spread that is not there. Say so instead.
+      const flat = max === min;
       const bars = vals
         .map((v, i) => {
-          const h = Math.max(10, Math.round((v / max) * 100));
+          const h = flat ? 50 : Math.max(10, Math.round((v / max) * 100));
           const mid = i === 2;
-          return `<div class="bd-pctile-bar${mid ? " bd-pctile-mid" : ""}" style="height:${h}%"></div>`;
+          return `<div class="bd-pctile-bar${mid ? " bd-pctile-mid" : ""}${flat ? " bd-pctile-flat" : ""}" style="height:${h}%"></div>`;
         })
         .join("");
       return `
-        <div class="bd-section-label">fee distribution (sat/vB)</div>
+        <div class="bd-section-label">fee distribution (sat/vB)${flat ? '<span class="bd-label-note">uniform at ' + esc(fmt(max)) + "</span>" : ""}</div>
         <div class="bd-pctile-chart">${bars}</div>
         <div class="bd-pctile-labels">
           <span><span class="bd-pctile-key">p10</span>${esc(fmt(vals[0]))}</span>
@@ -187,8 +201,13 @@ const blocksPanel = {
       ? `<span class="bd-hash-accent">${esc(hashFull.slice(0, 4))}</span>${esc(hashFull.slice(4, 8))}…${esc(hashFull.slice(-6))}`
       : "—";
 
-    const sizeStr = b.size ? utils.fmtBytes(b.size) : "—";
-    const wgtStr = b.weight ? f(b.weight / 1e6, 2) + " MWU" : "—";
+    // Core's getblockstats total_size/total_weight cover non-coinbase
+    // transactions only, while txs counts the coinbase. A block with txs === 1
+    // is therefore genuinely empty rather than missing data, and the figures
+    // below are transaction data, not the block's full serialised size.
+    const isEmpty = b.txs === 1 && !b.size;
+    const sizeStr = b.size ? utils.fmtBytes(b.size) : isEmpty ? "coinbase only" : "—";
+    const wgtStr = b.weight ? f(b.weight / 1e6, 2) + " MWU" : isEmpty ? "" : "—";
 
     // ── render ────────────────────────────────────────────────────────────────
 
@@ -207,6 +226,7 @@ const blocksPanel = {
 
       <div class="bd-meta-row">
         <span class="bd-age">${esc(ageDisplay)}</span>
+        ${b.pruned ? `<span class="fork-badge defined" title="Block data pruned — only header fields are available">pruned</span>` : ""}
         ${fillPct ? `<span class="bd-fill-badge ${fillBadgeCls}">${f(fillPct, 0)}% full</span>` : ""}
       </div>
 
@@ -238,8 +258,8 @@ const blocksPanel = {
             </div>
           </div>
           <div class="bd-fill-labels">
-            <span>${esc(sizeStr)} · ${esc(wgtStr)}</span>
-            <span style="color:${fillColor};font-weight:600">${fillPct ? f(fillPct, 0) + "%" : "—"} / 4 MWU</span>
+            <span>${esc(wgtStr ? sizeStr + " · " + wgtStr : sizeStr)}<span class="dim"> tx data</span></span>
+            <span style="color:${fillColor};font-weight:600">${fillPct ? f(fillPct, 0) + "%" : isEmpty ? "0%" : "—"} / 4 MWU</span>
           </div>
         </div>
 

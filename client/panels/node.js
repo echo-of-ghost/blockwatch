@@ -39,7 +39,7 @@ const nodePanel = {
     this._renderTitlebar(bc, ni, d.uptime, blocks, d);
     this._renderNodeInfo(bc, ni, d.rpcNode, blocks, now);
     this._renderChainTips(d.chainTips || [], bc.blocks || 0);
-    this._renderRetarget(bc.blocks || 0, bc.mediantime || 0, cts);
+    this._renderRetarget(bc.blocks || 0, bc.mediantime || 0, cts, d.retargetStats || null);
     this._renderConsensus(bc, cts);
     this._renderStorage(bc);
     this._renderNetworkReachability(ni);
@@ -296,9 +296,10 @@ const nodePanel = {
     setText("mn-ttx", cts.txcount ? fb(cts.txcount) : "—");
   },
 
-  _renderRetarget(height, mediantime, cts) {
+  _renderRetarget(height, mediantime, cts, rts) {
     const INTERVAL = 2016;
     const TARGET = 600;
+    const TIMESPAN = TARGET * INTERVAL; // 1209600s, Core's nPowTargetTimespan
     const posInPeriod = height % INTERVAL;
     const nextRetarget = height + (INTERVAL - posInPeriod);
     const blocksLeft = nextRetarget - height;
@@ -354,15 +355,38 @@ const nodePanel = {
         " UTC",
     );
 
-    const pctChange = (TARGET / avgSec - 1) * 100;
-    this._retargetState.pctChange = pctChange;
+    // Next-adjustment estimate the way Core computes it (pow.cpp,
+    // CalculateNextWorkRequired): the actual timespan runs from the first block
+    // of the period to the last — 2015 intervals, not 2016 — and the ratio is
+    // clamped to [1/4, 4]. `rts` is getchaintxstats over exactly the blocks
+    // mined so far this period; project its pace across the whole period.
+    let pctChange = null;
+    if (
+      rts &&
+      posInPeriod > 0 &&
+      rts.window_block_count === posInPeriod &&
+      rts.window_interval > 0
+    ) {
+      const projected = (rts.window_interval / rts.window_block_count) * (INTERVAL - 1);
+      const ratio = Math.min(4, Math.max(0.25, TIMESPAN / projected));
+      pctChange = (ratio - 1) * 100;
+    } else if (posInPeriod > 0 && !rts && avgSec > 0 && avgSec !== TARGET) {
+      // Older server without retargetStats: fall back to the trailing window.
+      pctChange = (TARGET / avgSec - 1) * 100;
+    }
+    this._retargetState.pctChange = pctChange ?? 0;
     const chgEl = $("mn-rt-chg");
     if (chgEl) {
-      const sign = pctChange >= 0 ? "+" : "";
-      const arrow = pctChange > 1 ? " ↑" : pctChange < -1 ? " ↓" : "";
-      chgEl.textContent = sign + pctChange.toFixed(2) + "%" + arrow;
-      chgEl.className =
-        "v " + (pctChange > 1 ? "o" : pctChange < -1 ? "grn" : "dim");
+      if (pctChange == null) {
+        chgEl.textContent = "—";
+        chgEl.className = "v dim";
+      } else {
+        const sign = pctChange >= 0 ? "+" : "";
+        const arrow = pctChange > 1 ? " ↑" : pctChange < -1 ? " ↓" : "";
+        chgEl.textContent = sign + pctChange.toFixed(2) + "%" + arrow;
+        chgEl.className =
+          "v " + (pctChange > 1 ? "o" : pctChange < -1 ? "grn" : "dim");
+      }
     }
 
     setText("mn-rt-avg", (avgSec / 60).toFixed(2) + " min/block");
