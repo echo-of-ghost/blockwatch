@@ -2,7 +2,7 @@
 
 A real-time Bitcoin node dashboard. Connects directly to your local Bitcoin Core node via RPC and displays live chain, mempool, peer, and network data in a clean, dense desktop interface.
 
-Uses Bitcoin Core's native ZMQ for real-time block notifications (14x fewer RPC calls) and falls back to polling if unavailable. No external APIs. Your node, your data.
+Uses Bitcoin Core's native ZMQ for real-time block notifications, with a 10-second RPC poll always running as a safety net. No external APIs. Your node, your data.
 
 ![blockwatch](assets/screenshot-mainnet.png)
 
@@ -132,11 +132,11 @@ ls -la ~/.bitcoin/.cookie
 ```bash
 git clone https://github.com/echo-of-ghost/blockwatch.git
 cd blockwatch
-npm install
+npm ci
 npm run app
 ```
 
-(If you skip `npm install`, blockwatch will still work but fall back to polling instead of using ZMQ for real-time updates.)
+`npm ci` installs exactly the versions recorded in `package-lock.json`. (If you skip it, blockwatch still works but relies on the 10-second poll instead of ZMQ for block updates.)
 
 ### 3. Enable ZMQ for real-time block updates (optional but highly recommended)
 
@@ -156,9 +156,9 @@ bitcoin-cli stop
 bitcoind -daemon
 ```
 
-blockwatch will automatically detect and connect to ZMQ on startup. You'll see `zmq: tcp://127.0.0.1:28332` in the startup banner if it's working.
+blockwatch connects to the ZMQ endpoint on startup. A ZMQ connection cannot fail loudly (the socket retries in the background forever), so the node panel's `zmq` / `polling` indicator and `/api/health`'s `blockSource` report which path is actually delivering blocks: `zmq` once the socket has connected or a block has arrived, `polling` otherwise.
 
-If you don't set up ZMQ, blockwatch will fall back to polling and still work fine — just with higher RPC overhead.
+If you don't set up ZMQ, the 10-second poll keeps everything working — blocks just show up a few seconds later.
 
 ### 4. First launch
 
@@ -198,6 +198,17 @@ All configuration is via environment variables — no config file needed.
 |---|---|---|
 | `ZMQ_HOST` | `127.0.0.1` | ZMQ publisher host (must match `zmqpubhashblock` bind address in bitcoin.conf) |
 | `ZMQ_PORT` | `28332` | ZMQ publisher port (must match bitcoin.conf) |
+
+### Remote mode
+
+By default the server binds `127.0.0.1` only and refuses to start with a non-loopback `HOST`. To serve the dashboard to other machines, enable remote mode, which binds `0.0.0.0` and requires HTTP basic auth on every request:
+
+| Variable | Description |
+|---|---|
+| `BLOCKWATCH_REMOTE=1` | Enable remote mode (basic auth, binds all interfaces) |
+| `BLOCKWATCH_USER` / `BLOCKWATCH_PASS` | Dashboard credentials (prompted if unset and stdin is a terminal) |
+
+Traffic is plain HTTP. Put it behind a TLS reverse proxy or a VPN/SSH tunnel rather than exposing it to the internet. Requests whose `Origin` does not match the `Host` they arrived on are rejected, so a cross-site page cannot drive peer actions with your cached credentials.
 
 ### Examples
 
@@ -368,12 +379,19 @@ Data updates on multiple timers and events:
 **Block Event (ZMQ hashblock — ~every 10 minutes):**
 ```
 getblockchaininfo
+getblockhash
 getblockheader
 getblockstats
-getchaintxstats
+getchaintxstats        (2016-block window: tx rate, avg block time)
+getchaintxstats        (current difficulty period: retarget estimate)
 getmempoolinfo
 ```
-Total: **5 calls per block**
+Total: **7 calls per block** (more after a gap or reorg — one header/stats pair per missing block, capped at 24)
+
+**Tip watcher (every 10 seconds):**
+```
+getblockchaininfo      (chain switch, header sync progress, new-block safety net)
+```
 
 **Fast Refresh (every 5 seconds):**
 ```
@@ -413,16 +431,17 @@ The `/api/data` endpoint serves cached state — no additional RPC calls made.
 ## Notes
 
 - **IBD (Initial Block Download)** — During sync, blockwatch automatically limits the blocks table to 8 entries (vs 16 when synced) and skips fee estimates to reduce RPC load on a node already running at capacity. ZMQ block events continue to fire normally. Everything returns to normal automatically once IBD completes.
-- **ZMQ configuration** — ZMQ is optional. If enabled in `bitcoin.conf`, blockwatch uses it for real-time block notifications (~0.5 RPC calls/min for block events). If not available, blockwatch falls back to polling every 10 seconds.
+- **ZMQ configuration** — ZMQ is optional. If enabled in `bitcoin.conf`, blockwatch uses it for sub-second block notifications. A 10-second `getblockchaininfo` poll always runs alongside it: it catches node/chain switches, keeps header-sync progress fresh, and picks up new blocks whenever ZMQ is not delivering (not configured, wrong host, or disconnected).
+- **Reorgs** — Block updates are keyed on `bestblockhash`, not height. A reorg (same height or deeper) replaces the orphaned blocks in the table, re-renders the block detail if it was showing one of them, and logs a `[reorg]` line on the server.
 - **Cookie vs credentials** — Bitcoin Core will not create a `.cookie` file if `rpcuser`/`rpcpassword` are set in `bitcoin.conf`. If blockwatch is prompting for credentials on every launch, remove those lines from your conf and restart bitcoind.
 - **Fee estimates** — `estimatesmartfee [1]` is called during the 60s sparse refresh, but only when not in IBD mode. On a freshly started node, fee estimates will show `—` rather than stale data. Estimates update every minute once warmed up.
 - **New block age** — When a new block arrives, the displayed age will be 5–10 seconds rather than 0s. This is expected: the `time` field is set by the miner, and several seconds elapse during P2P propagation, bitcoind processing, ZMQ delivery, and RPC round-trips before the dashboard renders it. The tip age counter ticks live every second between block events.
 - **Onion / I2P peers** — Peer addresses are displayed as plain text. Only clearnet addresses link to mempool.space since onion/i2p addresses are not resolvable there.
-- **Difficulty retarget estimate** — The estimated difficulty change is computed from actual measured block times during the current 2016-block period, not from the theoretical 10-minute target. The history resets at each new period.
+- **Difficulty retarget estimate** — The estimated change is computed the way Bitcoin Core does it: the time from the first block of the current 2016-block period to the tip is projected across 2015 intervals, compared with two weeks, and clamped to ¼–4×. It shows `—` on the first block of a period and is naturally noisy early in the period.
 - **getdeploymentinfo** — Available in Bitcoin Core v24+. On older nodes this call returns null and the softforks panel renders nothing rather than erroring. Updates every 5 minutes.
 - **Mempool updates** — The mempool panel updates every 5 seconds (via fast refresh). This gives real-time visibility into tx count, size, and fee rates without the latency of a full sparse refresh.
 - **Bandwidth history** — The network bandwidth chart maintains a 10-minute rolling window at 5-second resolution (120 samples).
-- **Security** — The `/api/rpc` endpoint (used for peer disconnect/ban actions) is restricted to loopback connections only. Every response includes a `Content-Security-Policy` header and a `Permissions-Policy` header that explicitly disables camera, microphone, geolocation, and payment APIs.
+- **Security** — In local mode the server binds loopback only and rejects requests whose `Host` header is not `localhost` / `127.0.0.1` (DNS-rebinding protection). In both modes an `Origin` header must match `Host`, and `/api/rpc` (peer disconnect/ban, ban list, UTXO set scan) only accepts `application/json` bodies, a fixed method allowlist, and per-method parameter shapes (ban targets must be IP literals or subnets no wider than /16 or /32; one UTXO scan at a time). Every response includes a `Content-Security-Policy` header and a `Permissions-Policy` header that explicitly disables camera, microphone, geolocation, and payment APIs. The in-app terminal has no method restrictions by design — like `bitcoin-cli`, it can run wallet commands.
 - **Connection errors** — If bitcoind is unreachable on first load, the connecting overlay is shown. After a successful first load, any subsequent connection errors surface in the status bar only — the dashboard stays visible with the last good data. The stale indicator shows how long data has been stale.
 
 ---

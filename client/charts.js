@@ -24,7 +24,11 @@ function chartHeight(panel, extras = 0) {
   const r = panel.getBoundingClientRect();
   if (r.width <= 10) return 0;
 
-  if (window.innerWidth < 1024) {
+  // Single-column layout only: panels are content-sized there, so deriving the
+  // canvas height from the panel would be circular. Above 768px the panel has a
+  // definite height (desktop absolute positioning, or the two-column grid's
+  // stretched rows) and the chart fills it.
+  if (window.innerWidth < 768) {
     return Math.min(220, Math.max(160, window.innerWidth * 0.45));
   }
 
@@ -240,8 +244,7 @@ const charts = {
       const ctx = setupCanvas(canvas, W, H);
       if (!ctx) return;
       if (!blocks || blocks.length < 2) {
-        const t4 = getComputedStyle(document.documentElement).getPropertyValue("--t4").trim() || "#555";
-        ctx.fillStyle = t4;
+        ctx.fillStyle = cssColor("--t4", "#868686");
         ctx.font = "10px Geist Mono, monospace";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
@@ -344,7 +347,7 @@ const charts = {
             ctx.fillStyle = "rgba(0,0,0,0.5)";
             ctx.fillText(label, x + bw / 2, y + fontSize + 2);
           } else {
-            ctx.fillStyle = "rgba(104,104,104,0.85)";
+            ctx.fillStyle = cssColor("--t4", "#868686");
             ctx.fillText(label, x + bw / 2, Math.max(fontSize + 1, y - 2));
           }
           ctx.restore();
@@ -354,7 +357,7 @@ const charts = {
       // 10m target line
       if (10 <= maxG) {
         const targetY = H - Math.floor((10 / maxG) * (H - 4)) - 1;
-        ctx.strokeStyle = "rgba(90,90,90,0.9)";
+        ctx.strokeStyle = cssColor("--t4", "#868686");
         ctx.lineWidth = 1;
         ctx.setLineDash([4, 3]);
         ctx.beginPath();
@@ -364,7 +367,7 @@ const charts = {
         ctx.setLineDash([]);
         ctx.font = "10px Geist Mono, monospace";
         ctx.textAlign = "right";
-        ctx.fillStyle = "rgba(90,90,90,0.8)";
+        ctx.fillStyle = cssColor("--t4", "#868686");
         ctx.fillText("10m", W - 1, targetY - 2);
       }
 

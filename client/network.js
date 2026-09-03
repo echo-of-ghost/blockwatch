@@ -51,11 +51,18 @@ const network = {
     if (!c._bwHoverWired) this._initHover();
 
     const parent = c.parentElement;
-    const cssW = Math.max(
-      60,
-      (parent?.getBoundingClientRect().width || 200) - 24,
-    );
-    const cssH = this.CHART_H;
+    const pr = parent?.getBoundingClientRect();
+    const cssW = Math.max(60, (pr?.width || 200) - 24);
+    // Fill the container the panel gives us. Below 768px panels are
+    // content-sized, so there is no definite height to fill and measuring the
+    // container would be circular — fall back to the fixed height there.
+    // Match the container exactly. Clamping up to CHART_H here would overflow
+    // a container smaller than that; the floor belongs in CSS (min-height on
+    // .bw-chart-wrap), where it can actually reserve the space.
+    const cssH =
+      window.innerWidth >= 768 && pr && pr.height > 20
+        ? Math.round(pr.height)
+        : this.CHART_H;
 
     const dpr = window.devicePixelRatio || 1;
     if (cssW !== this._lastW || cssH !== this._lastH) {
@@ -109,7 +116,13 @@ const network = {
       ctx.lineTo(cssW - PAD_R, y);
       ctx.stroke();
       ctx.setLineDash([]);
-      ctx.fillStyle = "rgba(104,104,104,0.9)";
+      // Tick labels sit over the plot, so give them a thin ground-coloured
+      // halo — otherwise the series line cuts through the glyphs at low values.
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = cssColor("--ink", "#0e0e0e");
+      ctx.strokeText(utils.fmtRate(tick), PAD_L + 3, y - 3);
+      ctx.lineWidth = 1;
+      ctx.fillStyle = cssColor("--t4", "#868686");
       ctx.fillText(utils.fmtRate(tick), PAD_L + 3, y - 3);
     });
 
@@ -128,7 +141,7 @@ const network = {
     // X-axis labels: "–Nm ago" at anchor points (240 samples × 5s = 20min)
     ctx.font = "10px Geist Mono, monospace";
     ctx.textAlign = "center";
-    ctx.fillStyle = "rgba(64,64,64,0.9)";
+    ctx.fillStyle = cssColor("--t4", "#868686");
     [
       { i: 0, label: "20m" },
       { i: Math.round(N * 0.25), label: "15m" },
@@ -261,7 +274,7 @@ const network = {
       ctx.textAlign = "left";
       ctx.fillText(line1, tx + tp, ty + 11);
       ctx.font = "10px Geist Mono, monospace";
-      ctx.fillStyle = "rgba(104,104,104,0.9)";
+      ctx.fillStyle = cssColor("--t4", "#868686");
       ctx.fillText(line2, tx + tp, ty + 23);
     }
 
@@ -338,6 +351,7 @@ const network = {
 const poller = {
   _prevTotals: null,
   _prevFetchAt: null,
+  _lastRates: { sent: 0, recv: 0 },
   _lastPushAt: 0,
   _failCount: 0,
   _retryTimer: null,
@@ -385,22 +399,34 @@ const poller = {
     }
 
     const nt = raw.netTotals || {};
-    const nowT = Date.now() / 1000;
     const totalSent = nt.totalbytessent || 0;
     const totalRecv = nt.totalbytesrecv || 0;
-    let sentRate = 0,
-      recvRate = 0;
+    // Time the sample by bitcoind's own clock (getnettotals.timemillis), not by
+    // arrival: block and peer broadcasts re-send the last fast-refresh totals,
+    // and timing those by arrival produced a false 0 followed by a spike.
+    const sampleT = nt.timemillis ? nt.timemillis / 1000 : Date.now() / 1000;
+    let sentRate = this._lastRates.sent,
+      recvRate = this._lastRates.recv;
 
     if (this._prevTotals && this._prevFetchAt) {
-      if (totalSent >= this._prevTotals.sent && totalRecv >= this._prevTotals.recv) {
-        const dt = Math.max(1, nowT - this._prevFetchAt);
-        sentRate = (totalSent - this._prevTotals.sent) / dt;
-        recvRate = (totalRecv - this._prevTotals.recv) / dt;
+      if (sampleT > this._prevFetchAt) {
+        if (totalSent >= this._prevTotals.sent && totalRecv >= this._prevTotals.recv) {
+          const dt = Math.max(0.5, sampleT - this._prevFetchAt);
+          sentRate = (totalSent - this._prevTotals.sent) / dt;
+          recvRate = (totalRecv - this._prevTotals.recv) / dt;
+        } else {
+          sentRate = 0; // counters went backwards: bitcoind restarted
+          recvRate = 0;
+        }
+        this._prevTotals = { sent: totalSent, recv: totalRecv };
+        this._prevFetchAt = sampleT;
       }
+      // Same sample as last time — keep the previous rate.
+    } else {
+      this._prevTotals = { sent: totalSent, recv: totalRecv };
+      this._prevFetchAt = sampleT;
     }
-
-    this._prevTotals = { sent: totalSent, recv: totalRecv };
-    this._prevFetchAt = nowT;
+    this._lastRates = { sent: sentRate, recv: recvRate };
 
     // Flush history buffers and reset panel state on chain switch
     const incomingChain = raw.blockchain?.chain || null;
@@ -410,6 +436,7 @@ const poller = {
       network._mempoolHistory.fill({ size: 0, txCount: 0 });
       this._prevTotals = null;
       this._prevFetchAt = null;
+      this._lastRates = { sent: 0, recv: 0 };
       sentRate = 0;
       recvRate = 0;
       blocksPanel._initialised = false;

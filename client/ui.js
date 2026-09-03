@@ -1278,7 +1278,7 @@ const heroStrip = {
       // Only chime when fully synced. blocks === headers means no known blocks
       // are pending validation — catches the last 1-2 catch-up blocks that
       // slip through once verificationprogress already reads >= 0.9999.
-      if (!bc.ibd && bc.blocks === bc.headers && (bc.verificationprogress || 0) >= 0.9999) this._playBlockTick();
+      if (!bc.initialblockdownload && bc.blocks === bc.headers && (bc.verificationprogress || 0) >= 0.9999) this._playBlockTick();
     }
     this._lastHeight = newHeight;
     this._setVal("hero-height", fb(newHeight), true);

@@ -151,8 +151,9 @@ const TOOLTIPS = {
       "Outputs typically exceed inputs because change outputs split coins.",
   },
   "size · fill": {
-    body: "Block size in bytes · percentage of the 4 MWU block weight limit used.",
-    extra: "Blocks above ~85% fill are considered near-capacity.",
+    body: "Transaction data in bytes · percentage of the 4 MWU block weight limit used.",
+    extra:
+      "From getblockstats, which counts non-coinbase transactions only, so both figures sit a coinbase below the block's full serialised size. Blocks above ~85% fill are considered near-capacity.",
   },
   "avg · total fee": {
     body: "Average fee rate across all transactions · total fees paid to the miner.",
@@ -513,6 +514,20 @@ const $ = (id) => document.getElementById(id);
 const $$ = (sel) => document.querySelectorAll(sel);
 const $q = (sel) => document.querySelector(sel);
 
+// Canvas text cannot inherit CSS custom properties, so charts read token values
+// directly rather than hardcoding greys. Keeps axis and legend labels inside the
+// same contrast budget as the rest of the UI when the palette changes.
+function cssColor(name, fallback) {
+  try {
+    const v = getComputedStyle(document.documentElement)
+      .getPropertyValue(name)
+      .trim();
+    return v || fallback;
+  } catch (_) {
+    return fallback;
+  }
+}
+
 function setText(id, v) {
   const el = $(id);
   if (el) el.textContent = v;
@@ -603,10 +618,15 @@ const utils = {
   fmtHR(diff, medianBlockSecs) {
     const t = medianBlockSecs > 0 ? medianBlockSecs : 600;
     const hr = ((+diff || 0) * Math.pow(2, 32)) / t;
+    // The ladder runs all the way down: signet and regtest difficulties are
+    // low enough that stopping at GH/s printed a real hashrate as "0.00 GH/s".
     if (hr >= 1e18) return this.f(hr / 1e18, 2) + " EH/s";
     if (hr >= 1e15) return this.f(hr / 1e15, 2) + " PH/s";
     if (hr >= 1e12) return this.f(hr / 1e12, 2) + " TH/s";
-    return this.f(hr / 1e9, 2) + " GH/s";
+    if (hr >= 1e9) return this.f(hr / 1e9, 2) + " GH/s";
+    if (hr >= 1e6) return this.f(hr / 1e6, 2) + " MH/s";
+    if (hr >= 1e3) return this.f(hr / 1e3, 2) + " KH/s";
+    return this.f(hr, 2) + " H/s";
   },
 
   fmtSats(sats) {
