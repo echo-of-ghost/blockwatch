@@ -528,7 +528,29 @@ const SLOW_RPC_METHODS = new Set([
   "verifychain",       // verifies all block files
 ]);
 
-function rpc(method, params = [], timeoutMs) {
+// Cancellable variant of rpc(). Returns the same promise plus a cancel handle
+// that destroys the underlying request, so the terminal can abort a call like
+// gettxoutsetinfo rather than holding its input for the 11-minute timeout.
+// rpc() below is left exactly as it was: it is on the audited hot path and
+// covered by the harness, so this is additive rather than a refactor.
+function rpcCancellable(method, params = [], timeoutMs) {
+  let req = null;
+  let cancelled = false;
+  const promise = rpc(method, params, timeoutMs, (r) => {
+    req = r;
+    // cancel() may have been called before the request object existed
+    if (cancelled) try { r.destroy(new Error("cancelled")); } catch (_) {}
+  });
+  return {
+    promise,
+    cancel() {
+      cancelled = true;
+      if (req) try { req.destroy(new Error("cancelled")); } catch (_) {}
+    },
+  };
+}
+
+function rpc(method, params = [], timeoutMs, onRequest) {
   const ms = timeoutMs ?? (SLOW_RPC_METHODS.has(method) ? 660000 : 12000);
   return new Promise((resolve, reject) => {
     const { user, pass } = getAuth();
@@ -575,6 +597,8 @@ function rpc(method, params = [], timeoutMs) {
       req.destroy();
       reject(new Error(method + " timeout"));
     });
+    // Hand the request to rpcCancellable so it can destroy it on demand.
+    if (typeof onRequest === "function") onRequest(req);
     req.write(body);
     req.end();
   });
@@ -1696,4 +1720,4 @@ function stop() {
   });
 }
 
-module.exports = { start, stop, rpc };
+module.exports = { start, stop, rpc, rpcCancellable };

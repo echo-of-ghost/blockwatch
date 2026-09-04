@@ -71,7 +71,7 @@ async function createWindow(port) {
 }
 
 app.whenReady().then(async () => {
-  const { start, rpc } = require("../server");
+  const { start, rpcCancellable } = require("../server");
   try {
     _serverPort = await start();
   } catch (e) {
@@ -84,24 +84,54 @@ app.whenReady().then(async () => {
 
   // Terminal IPC — renderer sends a bitcoin-cli style command, we call RPC
   // directly in the main process where credentials live.
-  let _lastExec = 0;
-  ipcMain.handle("terminal:exec", async (event, method, params) => {
+  //
+  // Single-flight rather than a time window: the console runs one command at a
+  // time by construction, so a 200ms rate limit only ever produced spurious
+  // "rate limited" errors on fast input. In-flight calls are tracked by id so
+  // the renderer can cancel a long one (gettxoutsetinfo runs for minutes).
+  const _inflight = new Map();
+
+  const fromDashboard = (event) =>
+    _win &&
+    event.sender === _win.webContents &&
+    event.senderFrame === _win.webContents.mainFrame;
+
+  ipcMain.handle("terminal:exec", async (event, id, method, params) => {
     // Only the dashboard's own main frame may drive RPC.
-    if (!_win || event.sender !== _win.webContents || event.senderFrame !== _win.webContents.mainFrame)
-      return { ok: false, error: "unauthorized sender" };
+    if (!fromDashboard(event)) return { ok: false, error: "unauthorized sender", kind: "input" };
+    if (!Number.isInteger(id)) return { ok: false, error: "invalid call id", kind: "input" };
     if (typeof method !== "string" || !/^[a-z0-9]{1,64}$/.test(method))
-      return { ok: false, error: "invalid method name" };
+      return { ok: false, error: "invalid method name", kind: "input" };
     if (params != null && !Array.isArray(params))
-      return { ok: false, error: "params must be an array" };
-    const now = Date.now();
-    if (now - _lastExec < 200) return { ok: false, error: "rate limited" };
-    _lastExec = now;
+      return { ok: false, error: "params must be an array", kind: "input" };
+    if (_inflight.size > 0) return { ok: false, error: "a command is already running", kind: "input" };
+
+    const call = rpcCancellable(method, params || []);
+    _inflight.set(id, call);
     try {
-      const result = await rpc(method, params || []);
+      const result = await call.promise;
       return { ok: true, result };
     } catch (e) {
-      return { ok: false, error: e.message };
+      const msg = e && e.message ? e.message : String(e);
+      // Separate what the node rejected from what never reached it, so the
+      // console can present them differently.
+      const kind = /cancelled/.test(msg)
+        ? "cancelled"
+        : /ECONNREFUSED|EHOSTUNREACH|ENOTFOUND|ETIMEDOUT|socket hang up|timeout|Unauthorized/i.test(msg)
+          ? "transport"
+          : "rpc";
+      return { ok: false, error: msg, kind };
+    } finally {
+      _inflight.delete(id);
     }
+  });
+
+  ipcMain.handle("terminal:cancel", (event, id) => {
+    if (!fromDashboard(event)) return { ok: false };
+    const call = _inflight.get(id);
+    if (!call) return { ok: false };
+    call.cancel();
+    return { ok: true };
   });
 
   await createWindow(_serverPort);
