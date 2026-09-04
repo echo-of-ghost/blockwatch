@@ -2,6 +2,7 @@
   "name": "blockwatch",
   "version": "2.3.0",
   "description": "Real-time Bitcoin node dashboard",
+  "desktopName": "Blockwatch.desktop",
   "main": "electron/main.js",
   "scripts": {
     "start": "node server.js",
@@ -47,7 +48,8 @@
           ]
         }
       ],
-      "category": "Finance"
+      "category": "Finance",
+      "syncDesktopName": true
     }
   },
   "author": "Maple <maplehodl@protonmail.com>",
