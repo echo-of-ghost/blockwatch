@@ -45,15 +45,15 @@ Uses Bitcoin Core's native ZMQ for real-time block notifications, with a 10-seco
 blockwatch ships as a self-contained Linux desktop application. Download the latest `.AppImage` from the [releases page](https://github.com/echo-of-ghost/blockwatch/releases), make it executable, and run it — no installation required.
 
 ```bash
-chmod +x Blockwatch-2.2.0.AppImage
-./Blockwatch-2.2.0.AppImage
+chmod +x Blockwatch-2.3.0.AppImage
+./Blockwatch-2.3.0.AppImage
 ```
 
 The app embeds a Node.js server and opens directly to the dashboard. All configuration (cookie auth, ZMQ, environment variables) works the same as described below.
 
-To build the AppImage yourself:
+To build the AppImage yourself (requires Node.js 22 or newer — see Requirements):
 ```bash
-npm install
+npm ci
 npm run dist        # outputs to dist/
 ```
 
@@ -71,7 +71,7 @@ the release you are verifying.
 
 | Releases | Key file | Fingerprint |
 |---|---|---|
-| 2.2.4 and later | `pubkey.asc` | `5757 5740 8588 8291 E05C  BEE9 F37F EFF1 9EF2 56B2` |
+| 2.3.0 and later | `pubkey.asc` | `5757 5740 8588 8291 E05C  BEE9 F37F EFF1 9EF2 56B2` |
 | 2.2.0 – 2.2.3 | `pubkey-2026-03-29.asc` | `0833 749B 80D9 C23C D361  0C97 0B21 FC31 5D77 0B0B` |
 
 **1. Import the key** for the release you are verifying (first time only):
@@ -86,7 +86,7 @@ gpg --fingerprint maplehodl@protonmail.com
 
 **3. Verify:**
 ```bash
-gpg --verify Blockwatch-2.2.4.AppImage.asc Blockwatch-2.2.4.AppImage
+gpg --verify Blockwatch-2.3.0.AppImage.asc Blockwatch-2.3.0.AppImage
 ```
 
 A good signature looks like:
@@ -102,7 +102,7 @@ not that anything is wrong with the download.
 
 #### Signing keys
 
-Releases from 2.2.4 onward are signed with `F37FEFF19EF256B2`, which expires
+Releases from 2.3.0 onward are signed with `F37FEFF19EF256B2`, which expires
 2028-09-03.
 
 The previous key `0B21FC315D770B0B` is no longer used for signing. It is kept as
@@ -112,7 +112,10 @@ The previous key `0B21FC315D770B0B` is no longer used for signing. It is kept as
 
 ## Requirements
 
-- [Node.js](https://nodejs.org) v18 or later
+- [Node.js](https://nodejs.org) v18 or later to run `server.js`
+- [Node.js](https://nodejs.org) **v22 or later to build** the AppImage or run the
+  Electron app from source. Electron's installer requires it, and on Node 18 the
+  install completes without ever downloading the Electron binary.
 - Bitcoin Core running locally with RPC enabled
 - (Optional) ZeroMQ support in Bitcoin Core for real-time block updates
 

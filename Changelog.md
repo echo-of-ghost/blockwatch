@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.2.4] - 2026-09-03
+## [2.3.0] - 2026-09-03
 
 Production-hardening release from a full server/client/Electron audit. Findings were reproduced against a mock Bitcoin Core (RPC + ZMQ) exercising reorgs, catch-up bursts, node restarts, warm-up errors, chain switches, malformed requests and CSRF/DNS-rebinding probes, then every fix was validated against Bitcoin Core v31.1: regtest with genuine `invalidateblock` reorgs, and a pruned signet node followed through a full 320,572-block sync and out the other side. 46 mock scenario checks and 62 real-node checks pass.
 
@@ -50,7 +50,7 @@ Production-hardening release from a full server/client/Electron audit. Findings 
 - **Section labels share one treatment**: the node panel rendered them lowercase while every other panel used uppercase. All section labels are now uppercase at the same tracking, with `.sec` differing only by the divider rule it adds.
 
 ### Security
-- **New release signing key**: releases from 2.2.4 are signed with `F37FEFF19EF256B2` (fingerprint `5757 5740 8588 8291 E05C BEE9 F37F EFF1 9EF2 56B2`, expires 2028-09-03), published as `pubkey.asc`. The previous key `0B21FC315D770B0B` is no longer used for signing and is kept as `pubkey-2026-03-29.asc` so releases 2.2.0 through 2.2.3 remain verifiable.
+- **New release signing key**: releases from 2.3.0 are signed with `F37FEFF19EF256B2` (fingerprint `5757 5740 8588 8291 E05C BEE9 F37F EFF1 9EF2 56B2`, expires 2028-09-03), published as `pubkey.asc`. The previous key `0B21FC315D770B0B` is no longer used for signing and is kept as `pubkey-2026-03-29.asc` so releases 2.2.0 through 2.2.3 remain verifiable.
 - **Electron 33 → 44, off end-of-life**: the packaged app shipped an unmaintained Chromium with known unpatched vulnerabilities. It now runs Electron 44.1.1 (Chromium 152). `electron-builder` moved 25.1.8 → 26.15.3 alongside it, which clears every outstanding advisory: `npm audit` goes from 14 vulnerabilities, one critical, to zero.
 - Building this requires Node 22 or newer. Electron's installer now calls `require()` on an ES-module-only `@electron/get`, which Node 18 cannot do, so on Node 18 the install silently completes without ever downloading the Electron binary. Node 18 is itself end-of-life as of April 2025.
 - Verified on Electron 44 against a live mainnet node: the preload bridge, sandbox isolation (`window.require` and `window.process` both undefined in the renderer), the terminal IPC round trip, and both IPC input guards all behave as they did on 33. `event.senderFrame` is now typed `WebFrameMain | null`, which the existing sender check handles correctly, since a null frame fails closed.
@@ -110,7 +110,7 @@ Production-hardening release from a full server/client/Electron audit. Findings 
 - **Titlebar vertical alignment**: all titlebar elements (version, sync badge, clock, snapshot button) now align to centre. Previously the clock appeared slightly higher than adjacent elements due to `inline-flex` baseline calculation differences.
 - **Hover highlight rows**: `.kv`, `.bd-kv`, `.pd-kv` hover state now uses a `::before` pseudo-element (`inset: 0 -12px; z-index: -1`) instead of a negative margin, eliminating the layout reflow on hover.
 - **Color tokens**: `--pos` / `--pos-rgb` / `--pos-dim` renamed to `--amber` / `--amber-rgb` / `--amber-dim` throughout CSS and JS for clarity. `--bg-canvas` token added for the app background.
-- **Contrast improved**: `--t3` raised from `#686868` to `#808080` and `--t4` from `#585858` to `#686868`. (Corrected in 2.2.4: this was described at the time as meeting WCAG AA, which it did not — `--t4` still measured 3.06:1 against `--raised`, where AA requires 4.5:1.)
+- **Contrast improved**: `--t3` raised from `#686868` to `#808080` and `--t4` from `#585858` to `#686868`. (Corrected in 2.3.0: this was described at the time as meeting WCAG AA, which it did not — `--t4` still measured 3.06:1 against `--raised`, where AA requires 4.5:1.)
 - **Font weight declaration corrected**: `@font-face` declared `font-weight: 100 900` (variable range) but only a Regular `.woff2` is bundled. Changed to `font-weight: 400` to match what is actually loaded.
 - **`user-select: none` scope tightened**: removed from `.panel` (which blocked text copy in detail panes); the drag handle `.ph` already had it.
 - **Service badge contrast**: `.svc-cap` background raised from `--t4` to `--t2` so the badge text passes contrast requirements.
