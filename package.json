@@ -1,7 +1,8 @@
 {
   "name": "blockwatch",
-  "version": "2.2.4",
+  "version": "2.3.0",
   "description": "Real-time Bitcoin node dashboard",
+  "desktopName": "Blockwatch.desktop",
   "main": "electron/main.js",
   "scripts": {
     "start": "node server.js",
@@ -20,8 +21,8 @@
     "zeromq": "^6.5.0"
   },
   "devDependencies": {
-    "electron": "^33.4.11",
-    "electron-builder": "^25.1.8"
+    "electron": "^44.1.1",
+    "electron-builder": "^26.15.3"
   },
   "build": {
     "appId": "com.blockwatch.dashboard",
@@ -39,8 +40,16 @@
       "node_modules/**"
     ],
     "linux": {
-      "target": [{ "target": "AppImage", "arch": ["x64"] }],
-      "category": "Finance"
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Finance",
+      "syncDesktopName": true
     }
   },
   "author": "Maple <maplehodl@protonmail.com>",

@@ -739,63 +739,28 @@ async function initState() {
   }
 
   const ibd = blockchain.initialblockdownload || false;
-
-  const [peerInfo, netTotals, uptime, deploymentInfo, cts, rts, chainTips] =
-    await Promise.all([
-      safe("getpeerinfo"),
-      safe("getnettotals"),
-      safe("uptime"),
-      safe("getdeploymentinfo"),
-      chainTxStats(blockchain.blocks),
-      retargetStats(blockchain.blocks),
-      safe("getchaintips"),
-    ]);
-
-  const feeFast = ibd ? null : await safe("estimatesmartfee", [1]);
-
-  const tipHeight = blockchain.blocks;
-  const count = Math.min(ibd ? 8 : 24, tipHeight + 1);
-  const heights = Array.from({ length: count }, (_, i) => tipHeight - i).filter(
-    (h) => h >= 0,
-  );
-
-  const hashes = heights.length
-    ? await Promise.all(heights.map((h) => safe("getblockhash", [h])))
-    : [];
-
-  const [headers, stats] = heights.length
-    ? await Promise.all([
-        Promise.all(
-          hashes.map((h) => (h ? safe("getblockheader", [h, true]) : null)),
-        ),
-        ibd
-          ? Promise.resolve(heights.map(() => null))
-          : Promise.all(
-              hashes.map((h) =>
-                h ? safe("getblockstats", [h, BLOCK_STATS_FIELDS]) : null,
-              ),
-            ),
-      ])
-    : [[], []];
-
-  const blocks = hashes
-    .map((hash, i) => (hash ? normalizeBlock(hash, headers[i], stats[i]) : null))
-    .filter(Boolean);
-
   const ni = networkInfo || {};
+
+  // Publish the headline data now rather than at the end. getblockchaininfo
+  // answers in milliseconds and already carries height, chain and sync
+  // progress, but the remaining stages are sequential round trips that take a
+  // second or two on a healthy node and far longer on one under IBD load.
+  // Holding everything back until the last stage meant the dashboard sat empty
+  // for all of it. Each stage below broadcasts as it lands, so the UI fills in
+  // progressively instead of appearing all at once.
   _state = {
     blockchain,
     networkInfo: ni,
     mempoolInfo: mempoolInfo || {},
-    peers: Array.isArray(peerInfo) ? peerInfo : [],
-    blocks,
-    chainTxStats: cts || {},
-    retargetStats: rts || null,
-    fees: normalizeFees(feeFast),
-    netTotals: netTotals || {},
-    uptime: uptime || 0,
-    deploymentInfo: deploymentInfo || {},
-    chainTips: Array.isArray(chainTips) ? chainTips : [],
+    peers: [],
+    blocks: [],
+    chainTxStats: {},
+    retargetStats: null,
+    fees: {},
+    netTotals: {},
+    uptime: 0,
+    deploymentInfo: {},
+    chainTips: [],
     minrelaytxfee: ni.relayfee ?? ni.minrelaytxfee ?? null,
     incrementalfee: ni.incrementalfee ?? null,
     networkWarnings: Array.isArray(ni.warnings)
@@ -805,6 +770,67 @@ async function initState() {
     rpcNode: RPC_HOST + ":" + RPC_PORT,
     zmqMode: blockSource(),
   };
+  broadcast();
+
+  // Blocks are what the eye goes to first, so fetch them next rather than
+  // last, and run the peer/network batch alongside instead of after it.
+  const tipHeight = blockchain.blocks;
+  const count = Math.min(ibd ? 8 : 24, tipHeight + 1);
+  const heights = Array.from({ length: count }, (_, i) => tipHeight - i).filter(
+    (h) => h >= 0,
+  );
+
+  const blocksPromise = (async () => {
+    if (!heights.length) return [];
+    const hashes = await Promise.all(heights.map((h) => safe("getblockhash", [h])));
+    const [headers, stats] = await Promise.all([
+      Promise.all(hashes.map((h) => (h ? safe("getblockheader", [h, true]) : null))),
+      ibd
+        ? Promise.resolve(heights.map(() => null))
+        : Promise.all(
+            hashes.map((h) =>
+              h ? safe("getblockstats", [h, BLOCK_STATS_FIELDS]) : null,
+            ),
+          ),
+    ]);
+    return hashes
+      .map((hash, i) => (hash ? normalizeBlock(hash, headers[i], stats[i]) : null))
+      .filter(Boolean);
+  })();
+
+  const restPromise = Promise.all([
+    safe("getpeerinfo"),
+    safe("getnettotals"),
+    safe("uptime"),
+    safe("getdeploymentinfo"),
+    chainTxStats(blockchain.blocks),
+    retargetStats(blockchain.blocks),
+    safe("getchaintips"),
+    ibd ? Promise.resolve(null) : safe("estimatesmartfee", [1]),
+  ]);
+
+  const blocks = await blocksPromise;
+  if (blocks.length) {
+    _state.blocks = blocks;
+    _state.ts = Date.now();
+    broadcast();
+  }
+
+  const [peerInfo, netTotals, uptime, deploymentInfo, cts, rts, chainTips, feeFast] =
+    await restPromise;
+
+  // Merge rather than replace: a ZMQ block event or the tip watcher may have
+  // already updated _state.blocks while these calls were in flight.
+  if (Array.isArray(peerInfo)) _state.peers = peerInfo;
+  if (netTotals) _state.netTotals = netTotals;
+  if (uptime != null) _state.uptime = uptime;
+  if (deploymentInfo) _state.deploymentInfo = deploymentInfo;
+  if (cts) _state.chainTxStats = cts;
+  _state.retargetStats = rts || null;
+  if (Array.isArray(chainTips)) _state.chainTips = chainTips;
+  _state.fees = normalizeFees(feeFast);
+  _state.ts = Date.now();
+  broadcast();
 }
 
 // ── Per-block refresh ─────────────────────────────────────────────────────────
@@ -1547,10 +1573,23 @@ async function start() {
   }
   await loadAuth();
 
-  // Build the initial state snapshot before accepting connections so the first
-  // SSE client always receives a complete payload. If bitcoind is unreachable,
-  // _state will hold an error payload and startFastRefresh will retry every 30s.
-  await initState();
+  // Build the first snapshot in the background rather than blocking startup on
+  // it. A node under load answers slowly — on a mainnet node mid-IBD a single
+  // getblockchaininfo can take seconds and getchaintips longer — and waiting
+  // here delayed the HTTP listener, which in turn delayed the Electron window,
+  // so the app appeared to hang with nothing on screen. The client already
+  // renders a connecting overlay while _state is empty, /api/data answers 503
+  // until then, and the SSE stream simply sends nothing until the first
+  // broadcast. Stamping _initRetryAt keeps startFastRefresh from firing a
+  // duplicate initState while this one is still in flight.
+  _initRetryAt = Date.now();
+  initState()
+    .then(() => {
+      if (_state && !_state.error) broadcast();
+    })
+    .catch((e) => {
+      console.error("[warn] initial snapshot failed: " + e.message);
+    });
 
   // ZMQ: non-blocking — fires onNewBlock on each hashblock event.
   // Falls back to 10s polling automatically if zeromq is missing or bitcoind
