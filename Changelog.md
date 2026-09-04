@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.4.0] - 2026-09-04
 
 ### Added
 - **The terminal is now a node operator console.** It stays a bottom drawer rather than becoming a floating window, since blockwatch already has a draggable panel system and a second overlapping-window paradigm would compete with it. Obstruction is addressed by making the drawer resizable from its top edge, with the height persisted. New: tab completion across all 151 RPC methods with cycling, output search, copy and clear controls, scroll-to-bottom, command history that survives restarts, an elapsed timer while a command runs, and a chain and node badge so mainnet and regtest are never confused. `Escape` now clears the input and only closes the drawer when there is nothing to lose.
