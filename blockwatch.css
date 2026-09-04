@@ -1810,7 +1810,62 @@ body.platform-darwin #titlebar {
   padding-left: var(--sp-14);
 }
 
-.term-result-err { color: var(--neg); }
+/* Error taxonomy: what the node rejected, what never reached it, and what the
+   console rejected before sending. Colour alone does not carry it — each is
+   prefixed so the distinction survives for anyone who cannot separate them. */
+.term-result-rpc,
+.term-result-err       { color: var(--neg); }
+.term-result-transport { color: var(--amber); }
+.term-result-input     { color: var(--t3); }
+.term-result-cancelled { color: var(--t4); }
+.term-result-rpc::before       { content: "node error · "; color: var(--t4); }
+.term-result-transport::before { content: "unreachable · "; color: var(--t4); }
+.term-result-input::before     { content: "input · "; color: var(--t4); }
+.term-result-cancelled::before { content: "cancelled · "; color: var(--t4); }
+
+/* ── Truncated large output ── */
+.term-truncated {
+  margin-top: var(--sp-6);
+  color: var(--t4);
+  font-size: var(--fs-xs);
+  font-family: var(--sans);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  white-space: normal;
+}
+.term-mini-btn {
+  font-family: var(--sans);
+  font-size: var(--fs-xs);
+  color: var(--t3);
+  background: var(--raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--sp-2) var(--sp-6);
+  cursor: pointer;
+  transition: color var(--t-fast), border-color var(--t-fast);
+}
+.term-mini-btn:hover:not(:disabled) { color: var(--t1); border-color: var(--t4); }
+.term-mini-btn:disabled { opacity: .5; cursor: default; }
+.tj-collapsed { color: var(--t4); }
+
+/* ── Running state ── */
+.term-busy {
+  color: var(--amber);
+  font-size: var(--fs-xs);
+  font-family: var(--sans);
+  padding-left: var(--sp-14);
+}
+
+/* ── Search hits ── */
+.term-entry.term-hit { border-left: 2px solid var(--t4); padding-left: var(--sp-8); }
+.term-entry.term-hit-active { border-left-color: var(--orange); background: var(--odim); }
+
+/* ── help output ── */
+.term-help-row { display: flex; gap: var(--sp-12); white-space: normal; }
+.term-help-key { color: var(--orange); min-width: 13ch; flex-shrink: 0; }
+.term-help-desc { color: var(--t3); font-family: var(--sans); }
+.term-help-note { color: var(--t4); font-family: var(--sans); margin-top: var(--sp-6); }
 
 /* ── JSON syntax colors ── */
 .tj-key  { color: var(--t2); }
@@ -1856,3 +1911,90 @@ body.platform-darwin #titlebar {
   height: 100vh !important;
   top: 0;
 }
+
+/* ── Resize handle — drag the top edge; height persists ── */
+.term-resize {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 5px;
+  cursor: ns-resize;
+  z-index: 2;
+}
+.term-resize::after {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: var(--border);
+  transition: background var(--t-fast);
+}
+.term-resize:hover::after { background: var(--orange); }
+/* While dragging, stop the pointer selecting text across the dashboard. */
+body.term-resizing { user-select: none; cursor: ns-resize; }
+#terminal-drawer.term-fullscreen .term-resize { display: none; }
+
+/* ── Node / status in the header ── */
+.term-node {
+  font-size: var(--fs-xs);
+  font-family: var(--mono);
+  color: var(--t3);
+  padding: var(--sp-2) var(--sp-6);
+  border-radius: var(--radius);
+  background: var(--raised);
+}
+.term-node-alt { color: var(--orange); background: var(--odim); }
+.term-status { font-size: var(--fs-xs); font-family: var(--sans); color: var(--t4); }
+.term-status-busy { color: var(--amber); }
+.term-status-ok   { color: var(--grn); }
+.term-status-err  { color: var(--neg); }
+
+/* ── Search bar ── */
+.term-search {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  padding: 0 var(--sp-14);
+  height: 28px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+}
+.term-search-icon { color: var(--t4); font-size: var(--fs-md); }
+.term-search-input {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--t1);
+  font-family: var(--mono);
+  font-size: var(--fs-xs);
+  caret-color: var(--orange);
+}
+.term-search-input::placeholder { color: var(--t4); }
+.term-search-count {
+  font-size: var(--fs-xs);
+  color: var(--t4);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ── Autocomplete candidates ── */
+.term-candidates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-4) var(--sp-8);
+  padding: var(--sp-6) var(--sp-14);
+  max-height: 66px;
+  overflow-y: auto;
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
+}
+.term-cand {
+  font-family: var(--mono);
+  font-size: var(--fs-xs);
+  color: var(--t3);
+  padding: var(--sp-2) var(--sp-6);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.term-cand:hover { color: var(--t1); background: var(--raised); }
+.term-cand-active { color: var(--orange); background: var(--odim); }

@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **The terminal is now a node operator console.** It stays a bottom drawer rather than becoming a floating window, since blockwatch already has a draggable panel system and a second overlapping-window paradigm would compete with it. Obstruction is addressed by making the drawer resizable from its top edge, with the height persisted. New: tab completion across all 151 RPC methods with cycling, output search, copy and clear controls, scroll-to-bottom, command history that survives restarts, an elapsed timer while a command runs, and a chain and node badge so mainnet and regtest are never confused. `Escape` now clears the input and only closes the drawer when there is nothing to lose.
+
+### Fixed
+- **Large terminal output could freeze the renderer.** The printer concatenated a single HTML string and assigned it via `innerHTML`, so `getrawmempool` on a busy node (tens of thousands of txids) or `getblock` at verbosity 2 built megabytes of markup in one go. Output is now DOM nodes rendered under an explicit budget with a depth cap; beyond it the result is summarised with a render-all control, and the raw value is kept off-DOM so copying still yields everything. A synthetic 50,000-element render stays at 4,000 nodes in 10 ms.
+- **Terminal arguments containing JSON with spaces were torn apart.** The parser split on whitespace outside quotes only, so `{"a": 1, "b": [2, 3]}` became three broken tokens. The tokenizer now tracks bracket depth as well as quote state.
+- **No terminal command could be cancelled.** `gettxoutsetinfo` carries an eleven-minute timeout and held the input disabled for its duration. `server.js` gains a cancellable RPC variant alongside the existing one, and `ctrl+c` now frees the input in about 115 ms.
+- **Command history was lost on every restart**, despite localStorage already being used for chain, sound and layout. It now persists, capped and de-duplicated.
+- **Fast input produced spurious "rate limited" errors.** The 200 ms window in the IPC handler is replaced by single-flight, which is what the console does anyway.
+- **32 RPC methods were missing from completion**, including `getblockcount` and `getmempoolinfo`, because the `help` parser required trailing whitespace that zero-argument methods do not print.
+- **Terminal errors were undifferentiated.** Node rejections, transport failures and malformed input are now presented distinctly, labelled in text rather than by colour alone.
+
 ## [2.3.0] - 2026-09-03
 
 Production-hardening release from a full server/client/Electron audit. Findings were reproduced against a mock Bitcoin Core (RPC + ZMQ) exercising reorgs, catch-up bursts, node restarts, warm-up errors, chain switches, malformed requests and CSRF/DNS-rebinding probes, then every fix was validated against Bitcoin Core v31.1: regtest with genuine `invalidateblock` reorgs, and a pruned signet node followed through a full 320,572-block sync and out the other side. 46 mock scenario checks and 62 real-node checks pass.

@@ -17,5 +17,7 @@ ipcRenderer.on("terminal:toggle", () => {
 // through the main process where RPC credentials live. No credentials are ever
 // passed to or accessible from the renderer.
 contextBridge.exposeInMainWorld("terminal", {
-  exec: (method, params) => ipcRenderer.invoke("terminal:exec", method, params),
+  // id lets the renderer cancel a specific in-flight call.
+  exec: (id, method, params) => ipcRenderer.invoke("terminal:exec", id, method, params),
+  cancel: (id) => ipcRenderer.invoke("terminal:cancel", id),
 });
