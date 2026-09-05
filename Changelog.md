@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.5.0] - 2026-09-05
 
 ### Added
 - **The hidden features are now findable.** A product review scored discoverability 4/10: the terminal rewritten for 2.4.0 had no button, icon or hint anywhere in the interface and was reachable only by knowing `ctrl+\``, panels could be dragged, resized, hidden and reset with none of it signposted, and clicking a block height to jump to any height looked exactly like a static heading. Two titlebar badges now open the terminal and a shortcuts sheet, and `?` opens that sheet from anywhere outside a text field. The sheet documents 22 interactions across five groups, including the ones that were previously undocumented entirely. It is a labelled modal dialog that traps focus, closes on `Escape` and returns focus to whatever opened it. No new capability was added; this only makes shipped work reachable.
