@@ -1241,6 +1241,135 @@ const mobileBar = {
 // ═══════════════════════════════════════════════════════════════════════════════
 // HERO STRIP — block height · next-block fee · mempool · peers
 // ═══════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
+// SHORTCUTS OVERLAY
+// Nearly everything powerful here is invisible: the terminal, panel drag and
+// hide, arrow-key table navigation, the block-height jump, the label tooltips.
+// This sheet is the one place that says so.
+//
+// The list is maintained beside the handlers it documents, in this file and in
+// boot.js, because a shortcuts sheet that drifts out of date is worse than no
+// sheet at all. Every entry below is verified against the live app in the
+// discoverability test suite.
+// ═══════════════════════════════════════════════════════════════════════════════
+const shortcutsOverlay = {
+  _lastFocus: null,
+
+  GROUPS: [
+    ["global", [
+      ["Ctrl + `", "open or close the terminal"],
+      ["?", "show this sheet"],
+      ["Esc", "close the terminal, a menu, or this sheet"],
+    ]],
+    ["tables", [
+      ["↑ / ↓", "move between rows in the peers and blocks tables"],
+      ["Enter / Space", "select the focused row"],
+      ["Esc", "clear the peer filter"],
+      ["↓ in the filter", "jump into the peer list"],
+    ]],
+    ["panels", [
+      ["drag a header", "reorder panels, within or across columns"],
+      ["drag an edge", "resize a panel"],
+      ["right-click a header", "hide the panel, open the terminal, reset the layout"],
+      ["", "layout, column widths and hidden panels persist across sessions"],
+    ]],
+    ["terminal", [
+      ["Tab", "complete an RPC method name; press again to cycle"],
+      ["↑ / ↓", "command history, kept across restarts"],
+      ["Ctrl + C", "cancel the running command"],
+      ["Ctrl + L", "clear the output"],
+      ["Ctrl + F", "search the output"],
+      ["drag the top edge", "resize the drawer; the height is remembered"],
+    ]],
+    ["easily missed", [
+      ["click a block height", "jump to any block by height"],
+      ["hover a label", "most labels carry an explanation"],
+      ["click a row", "open peer or block detail"],
+      ["snapshot ↓", "download the current state as JSON"],
+      ["blocks ↓ / peers ↓", "export the table as TSV"],
+    ]],
+  ],
+
+  _build() {
+    const body = $("sc-body");
+    if (!body || body.childElementCount) return;
+    const frag = document.createDocumentFragment();
+    for (const [title, rows] of this.GROUPS) {
+      const g = document.createElement("div");
+      g.className = "sc-group";
+      const h = document.createElement("div");
+      h.className = "sc-group-title";
+      h.textContent = title;
+      g.appendChild(h);
+      for (const [key, desc] of rows) {
+        const r = document.createElement("div");
+        r.className = "sc-row";
+        const k = document.createElement("span");
+        k.className = "sc-key";
+        if (key) k.textContent = key;
+        const d = document.createElement("span");
+        d.className = "sc-desc";
+        d.textContent = desc;
+        r.appendChild(k);
+        r.appendChild(d);
+        g.appendChild(r);
+      }
+      frag.appendChild(g);
+    }
+    body.appendChild(frag);
+  },
+
+  isOpen() {
+    const el = $("shortcuts");
+    return !!el && el.style.display !== "none";
+  },
+
+  open() {
+    const el = $("shortcuts");
+    if (!el || this.isOpen()) return;
+    this._build();
+    this._lastFocus = document.activeElement;
+    el.style.display = "flex";
+    requestAnimationFrame(() => el.classList.add("sc-visible"));
+    const close = $("sc-close");
+    if (close) close.focus();
+  },
+
+  close() {
+    const el = $("shortcuts");
+    if (!el || !this.isOpen()) return;
+    el.classList.remove("sc-visible");
+    el.style.display = "none";
+    // Return focus where it came from rather than dumping it on <body>.
+    if (this._lastFocus && document.contains(this._lastFocus)) {
+      try { this._lastFocus.focus(); } catch (_) {}
+    }
+    this._lastFocus = null;
+  },
+
+  toggle() { this.isOpen() ? this.close() : this.open(); },
+
+  // Keep Tab inside the sheet while it is modal.
+  _trapFocus(e) {
+    const el = $("shortcuts");
+    if (!el || !this.isOpen() || e.key !== "Tab") return;
+    const focusable = el.querySelectorAll('button, [href], [tabindex]:not([tabindex="-1"])');
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  },
+
+  init() {
+    $("sc-close")?.addEventListener("click", () => this.close());
+    // Click the backdrop, but not the sheet itself, to dismiss.
+    $("shortcuts")?.addEventListener("mousedown", (e) => {
+      if (e.target && e.target.id === "shortcuts") this.close();
+    });
+  },
+};
+
 const heroStrip = {
   _lastHeight: null,
   _soundOn: false,

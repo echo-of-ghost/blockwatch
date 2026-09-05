@@ -1458,6 +1458,22 @@ a.ext-link:hover { color: var(--orange); }
   flex-shrink: 0;
   cursor: text;
 }
+/* Scoped to role="button", which _bindHeightSearch sets on the block-detail
+   height only. The mempool panel reuses .bd-height for its transaction count,
+   which is not interactive — styling the bare class would have advertised a
+   click that does nothing, the exact opposite of the intent here.
+   Same dotted underline as the tooltip anchors, so "interactive" reads
+   consistently across the app. */
+.bd-height[role="button"] {
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: transparent;
+  text-underline-offset: 4px;
+  transition: text-decoration-color var(--t-fast);
+}
+.bd-height[role="button"]:hover,
+.bd-height[role="button"]:focus-visible { text-decoration-color: var(--t4); }
 .bd-height-input::selection { background: rgba(var(--orange-rgb), .35); color: var(--t1); }
 .bd-height-input {
   accent-color: var(--orange);
@@ -1998,3 +2014,127 @@ body.term-resizing { user-select: none; cursor: ns-resize; }
 }
 .term-cand:hover { color: var(--t1); background: var(--raised); }
 .term-cand-active { color: var(--orange); background: var(--odim); }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   SHORTCUTS OVERLAY
+   Dismissible sheet, not a takeover: the dashboard stays visible behind it so
+   the reader keeps their place. Modelled on #connecting's fixed-inset approach.
+   ══════════════════════════════════════════════════════════════════════════════ */
+.sc-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 995;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-24);
+  /* Uniform scrim. An earlier version used a radial gradient here to soften
+     the falloff; it lightened the centre and read as a lamp behind the dialog
+     rather than glass over the app. The only soft falloff belongs to the
+     sheet's own shadow, which is local to the sheet where it makes sense. */
+  background: rgba(7, 7, 8, .74);
+  backdrop-filter: blur(7px) saturate(112%);
+  -webkit-backdrop-filter: blur(7px) saturate(112%);
+  opacity: 0;
+  transition: opacity var(--t-std) ease;
+}
+.sc-overlay.sc-visible { opacity: 1; }
+
+.sc-sheet {
+  width: min(720px, 100%);
+  max-height: min(80vh, 720px);
+  display: flex;
+  flex-direction: column;
+  background: var(--ink);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  /* Not --shadow-focused: that is tuned for a panel resting on the dashboard,
+     and against a dimmed backdrop its tight falloff reads as a hard rim. A
+     modal floats much further off the surface, so three layers of increasing
+     blur and decreasing opacity give a smooth gradient with no visible edge. */
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.03) inset,
+    0 2px 6px rgba(0,0,0,.30),
+    0 12px 30px rgba(0,0,0,.42),
+    0 32px 64px rgba(0,0,0,.42);
+  overflow: hidden;
+  /* Settles into place rather than snapping. The reduced-motion block below
+     collapses this to nothing along with every other transition. */
+  transform: translateY(6px) scale(.985);
+  opacity: 0;
+  transition: transform var(--t-std) cubic-bezier(.2,.7,.3,1), opacity var(--t-std) ease;
+}
+.sc-overlay.sc-visible .sc-sheet { transform: none; opacity: 1; }
+
+.sc-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-12);
+  padding: var(--sp-12) var(--sp-16);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.sc-title {
+  margin: 0;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--t3);
+  font-family: var(--mono);
+}
+.sc-close {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--t3);
+  font-size: var(--fs-lg);
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 var(--sp-4);
+  transition: color var(--t-fast);
+}
+.sc-close:hover { color: var(--t1); }
+
+.sc-body {
+  overflow-y: auto;
+  padding: var(--sp-16);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--sp-20) var(--sp-24);
+  align-content: start;
+}
+.sc-group-title {
+  font-size: var(--fs-xs);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--t4);
+  font-family: var(--sans);
+  margin-bottom: var(--sp-6);
+  padding-bottom: var(--sp-4);
+  border-bottom: 1px solid var(--border);
+}
+.sc-row {
+  display: grid;
+  grid-template-columns: minmax(96px, auto) 1fr;
+  gap: var(--sp-10);
+  align-items: baseline;
+  padding: var(--sp-4) 0;
+}
+.sc-key {
+  font-family: var(--mono);
+  font-size: var(--fs-xs);
+  color: var(--orange);
+  white-space: nowrap;
+}
+.sc-desc {
+  font-family: var(--sans);
+  font-size: var(--fs-xs);
+  color: var(--t2);
+  line-height: 1.5;
+}
+
+@media (max-width: 640px) {
+  .sc-body { grid-template-columns: 1fr; }
+  .sc-row { grid-template-columns: 1fr; gap: 0; }
+}
