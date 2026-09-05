@@ -48,7 +48,12 @@ const blocksPanel = {
                 : "var(--t4)";
 
         return `<tr class="${isNew ? "new" : ""} ${isSel ? "peer-sel" : ""}" role="row" tabindex="0" aria-selected="${isSel}" data-bheight="${b.height}">
-        <td class="td-num"><a class="ext-link" href="${utils.mspaceUrl(b.hash, nodePanel.currentChain)}" target="_blank" rel="noopener noreferrer">${fb(b.height)}</a></td>
+        <td class="td-num">${(() => {
+          const href = utils.explorer.blockUrl(b.hash, nodePanel.currentChain);
+          return href
+            ? `<a class="ext-link" href="${esc(href)}" target="_blank" rel="noopener noreferrer">${fb(b.height)}</a>`
+            : fb(b.height);
+        })()}</td>
         <td class="td-hash td-hash-click" data-copy="${esc(b.hash || "")}"><span class="td-hash-prefix">${(b.hash || "").slice(0, 4)}${(b.hash || "").slice(4, 8)}…</span><em>${(b.hash || "").slice(-4)}</em></td>
         <td class="td-dim">${fb(b.txs)}</td>
         <td class="td-fill">
@@ -218,8 +223,12 @@ const blocksPanel = {
       <div class="bd-header">
         <span class="bd-height">#${fb(b.height)}</span>
         <span class="bd-hash-wrap">
-          <a class="ext-link" href="${utils.mspaceUrl(b.hash, nodePanel.currentChain)}"
-             target="_blank" rel="noopener noreferrer">${hashDisplay}</a><span
+          ${(() => {
+            const href = utils.explorer.blockUrl(b.hash, nodePanel.currentChain);
+            return href
+              ? `<a class="ext-link" href="${esc(href)}" target="_blank" rel="noopener noreferrer">${hashDisplay}</a>`
+              : `<span class="bd-hash-plain">${hashDisplay}</span>`;
+          })()}<span
              data-copy="${esc(hashFull)}" class="copy-icon">⎘</span>
         </span>
       </div>

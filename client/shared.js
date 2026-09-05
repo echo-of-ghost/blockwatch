@@ -677,12 +677,86 @@ const utils = {
     return flags.length ? flags : ["NONE"];
   },
 
-  mspaceUrl(hash, chain) {
-    const prefixes = { testnet4: "testnet4/", signet: "signet/" };
-    const safeHash = /^[0-9a-fA-F]{64}$/.test(hash || "") ? hash : "";
-    return (
-      "https://mempool.space/" + (prefixes[chain] || "") + "block/" + safeHash
-    );
+  // ── Block explorer ────────────────────────────────────────────────────────
+  // Blockwatch exists so you do not have to ask a third party about your own
+  // chain, yet every block hash used to link to mempool.space unconditionally,
+  // telling them which blocks you inspect. The target is now a setting, and
+  // "none" is a first-class choice rather than an omission.
+  explorer: {
+    KEY: "bw-explorer",
+    // A 64-hex stand-in used to validate a template before a real hash exists.
+    _PROBE: "0".repeat(64),
+
+    DEFAULT: { mode: "mempool", url: "" },
+
+    // mempool.space runs no regtest instance, so a private chain has no valid
+    // target there. Absent (not empty) means "this preset cannot serve it".
+    _MEMPOOL_PREFIX: { main: "", test: "testnet/", testnet4: "testnet4/", signet: "signet/" },
+
+    get() {
+      try {
+        const raw = localStorage.getItem(this.KEY);
+        if (!raw) return { ...this.DEFAULT };
+        const o = JSON.parse(raw);
+        if (!o || typeof o !== "object") return { ...this.DEFAULT };
+        return {
+          mode: ["mempool", "custom", "none"].includes(o.mode) ? o.mode : "mempool",
+          url: typeof o.url === "string" ? o.url : "",
+        };
+      } catch (_) {
+        return { ...this.DEFAULT };
+      }
+    },
+
+    set(cfg) {
+      try { localStorage.setItem(this.KEY, JSON.stringify(cfg)); } catch (_) {}
+    },
+
+    // Returns { href, hasPlaceholder } for a usable target, or null.
+    sanitize(raw) {
+      const s = String(raw || "").trim();
+      if (!s) return null;
+      const hasPlaceholder = s.includes("{hash}");
+      let u;
+      try {
+        u = new URL(hasPlaceholder ? s.split("{hash}").join(this._PROBE) : s);
+      } catch (_) {
+        return null;
+      }
+      // The only schemes that may reach an href. Checking the *parsed* protocol
+      // rather than the raw prefix is what catches "java\nscript:alert(1)".
+      if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+      if (!u.hostname) return null;
+      // Return the normalised href, never the raw string. URL parsing strips
+      // embedded newlines and tabs before reporting the protocol — and so does
+      // HTML attribute parsing, so raw text that looked rejected here would
+      // still execute in the DOM. The normalised form cannot.
+      return { href: u.href, hasPlaceholder };
+    },
+
+    // null means "render the height as plain text" — a disabled explorer, an
+    // unsupported chain and a malformed setting all fail closed to no link.
+    blockUrl(hash, chain) {
+      const safeHash = /^[0-9a-fA-F]{64}$/.test(hash || "") ? hash : "";
+      if (!safeHash) return null;
+
+      const cfg = this.get();
+      if (cfg.mode === "none") return null;
+
+      if (cfg.mode === "mempool") {
+        const prefix = this._MEMPOOL_PREFIX[chain];
+        if (prefix === undefined) return null;
+        return "https://mempool.space/" + prefix + "block/" + safeHash;
+      }
+
+      const v = this.sanitize(cfg.url);
+      if (!v) return null;
+      // A self-hosted explorer serves the one chain its node is attached to, so
+      // no network prefix is inferred; {hash} is offered for anything whose
+      // path does not end in /block/<hash>.
+      if (v.hasPlaceholder) return v.href.split(this._PROBE).join(safeHash);
+      return v.href.replace(/\/+$/, "") + "/block/" + safeHash;
+    },
   },
 
   copyToClipboard(text, el) {

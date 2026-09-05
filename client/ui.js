@@ -1252,6 +1252,132 @@ const mobileBar = {
 // sheet at all. Every entry below is verified against the live app in the
 // discoverability test suite.
 // ═══════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
+// SETTINGS OVERLAY
+// Settings previously had no home at all — sound, chain and tooltip state were
+// each toggled by their own control and written straight to localStorage. The
+// explorer target is the first setting with no natural control to hang off, so
+// it gets a sheet, and that sheet is where later settings go.
+// ═══════════════════════════════════════════════════════════════════════════════
+const settingsOverlay = {
+  _lastFocus: null,
+
+  isOpen() {
+    const el = $("settings");
+    return !!el && el.style.display !== "none";
+  },
+
+  open() {
+    const el = $("settings");
+    if (!el || this.isOpen()) return;
+    this._load();
+    this._lastFocus = document.activeElement;
+    el.style.display = "flex";
+    requestAnimationFrame(() => el.classList.add("sc-visible"));
+    // Focus the selected mode rather than the close button: it is the control
+    // someone came here to change.
+    const checked = el.querySelector('input[name="set-explorer"]:checked');
+    (checked || $("set-close"))?.focus();
+  },
+
+  close() {
+    const el = $("settings");
+    if (!el || !this.isOpen()) return;
+    el.classList.remove("sc-visible");
+    el.style.display = "none";
+    if (this._lastFocus && document.contains(this._lastFocus)) {
+      try { this._lastFocus.focus(); } catch (_) {}
+    }
+    this._lastFocus = null;
+  },
+
+  toggle() { this.isOpen() ? this.close() : this.open(); },
+
+  _trapFocus(e) {
+    const el = $("settings");
+    if (!el || !this.isOpen() || e.key !== "Tab") return;
+    const f = [...el.querySelectorAll('button, input, [href], [tabindex]:not([tabindex="-1"])')]
+      .filter((n) => !n.disabled && n.offsetParent !== null);
+    if (!f.length) return;
+    const first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  },
+
+  // Reflect stored config into the form.
+  _load() {
+    const cfg = utils.explorer.get();
+    const radio = $("set-exp-" + cfg.mode);
+    if (radio) radio.checked = true;
+    const url = $("set-exp-url");
+    if (url) url.value = cfg.url || "";
+    this._syncCustom();
+  },
+
+  _mode() {
+    return document.querySelector('input[name="set-explorer"]:checked')?.value || "mempool";
+  },
+
+  // The URL field is only meaningful for the custom mode, and an input nobody
+  // can use should not be a tab stop.
+  _syncCustom() {
+    const custom = this._mode() === "custom";
+    const wrap = $q(".set-custom");
+    const url = $("set-exp-url");
+    if (wrap) wrap.classList.toggle("set-custom-on", custom);
+    if (url) url.disabled = !custom;
+    this._validate();
+  },
+
+  // Live feedback. Showing the URL that will actually be opened is the only
+  // way someone can tell a working base from one that merely looks right.
+  _validate() {
+    const msg = $("set-exp-msg");
+    if (!msg) return;
+    if (this._mode() !== "custom") { msg.textContent = ""; msg.className = "set-msg"; return; }
+
+    const raw = $("set-exp-url")?.value || "";
+    if (!raw.trim()) {
+      msg.textContent = "Enter a base URL, or use {hash} to place the block hash yourself.";
+      msg.className = "set-msg";
+      return;
+    }
+    if (!utils.explorer.sanitize(raw)) {
+      msg.textContent = "Not a usable address. Must start with http:// or https://";
+      msg.className = "set-msg set-msg-bad";
+      return;
+    }
+    const sample = "0".repeat(63) + "1";
+    const built = utils.explorer.blockUrl(sample, nodePanel.currentChain);
+    msg.textContent = built ? "Opens: " + built.slice(0, 72) + (built.length > 72 ? "…" : "") : "";
+    msg.className = "set-msg set-msg-ok";
+  },
+
+  // Persist immediately, matching how sound, chain and layout already behave.
+  _save() {
+    utils.explorer.set({ mode: this._mode(), url: $("set-exp-url")?.value || "" });
+    this._validate();
+    // Repaint so existing rows pick up the new target without a reload.
+    try { blocksPanel.render(poller._lastData || {}); } catch (_) {}
+  },
+
+  init() {
+    $("set-close")?.addEventListener("click", () => this.close());
+    $("settings")?.addEventListener("mousedown", (e) => {
+      if (e.target && e.target.id === "settings") this.close();
+    });
+    document.querySelectorAll('input[name="set-explorer"]').forEach((r) => {
+      r.addEventListener("change", () => { this._syncCustom(); this._save(); });
+    });
+    const url = $("set-exp-url");
+    url?.addEventListener("input", () => this._save());
+    // Enter in a single-field form should dismiss, not submit nothing.
+    url?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); this.close(); }
+    });
+  },
+};
+
 const shortcutsOverlay = {
   _lastFocus: null,
 
@@ -1287,6 +1413,7 @@ const shortcutsOverlay = {
       ["click a row", "open peer or block detail"],
       ["snapshot ↓", "download the current state as JSON"],
       ["blocks ↓ / peers ↓", "export the table as TSV"],
+      ["⚙ in the titlebar", "choose your block explorer, or turn outbound links off"],
     ]],
   ],
 

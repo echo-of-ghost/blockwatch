@@ -70,6 +70,13 @@
             >?</button>
             <button
               type="button"
+              id="settings-btn"
+              class="tb-sound-badge"
+              aria-label="Settings"
+              title="Settings"
+            >⚙</button>
+            <button
+              type="button"
               id="sound-btn"
               class="tb-sound-badge"
               aria-label="Toggle new block sound"
@@ -732,6 +739,58 @@
           <button type="button" id="sc-close" class="sc-close" aria-label="Close shortcuts" title="Close  (Esc)">×</button>
         </div>
         <div class="sc-body" id="sc-body"></div>
+      </div>
+    </div>
+
+    <!-- Settings. Reuses the shortcuts sheet's overlay and chrome so the app
+         has one modal language rather than two. -->
+    <div id="settings" class="sc-overlay" style="display: none" role="dialog"
+         aria-modal="true" aria-labelledby="set-title" tabindex="-1">
+      <div class="sc-sheet set-sheet">
+        <div class="sc-head">
+          <h2 class="sc-title" id="set-title">Settings</h2>
+          <button type="button" id="set-close" class="sc-close" aria-label="Close settings" title="Close  (Esc)">×</button>
+        </div>
+        <div class="set-body">
+          <fieldset class="set-group">
+            <legend class="set-legend">block explorer</legend>
+            <p class="set-help">
+              Where block heights and hashes link to. Blockwatch never contacts an
+              explorer itself, but whichever site you choose learns which blocks you open.
+            </p>
+
+            <label class="set-opt">
+              <input type="radio" name="set-explorer" value="mempool" id="set-exp-mempool" />
+              <span class="set-opt-text">
+                <span class="set-opt-name">mempool.space</span>
+                <span class="set-opt-note">public explorer &middot; the default</span>
+              </span>
+            </label>
+
+            <label class="set-opt">
+              <input type="radio" name="set-explorer" value="custom" id="set-exp-custom" />
+              <span class="set-opt-text">
+                <span class="set-opt-name">custom</span>
+                <span class="set-opt-note">a self-hosted explorer you run yourself</span>
+              </span>
+            </label>
+            <div class="set-custom">
+              <input type="text" id="set-exp-url" class="set-input" spellcheck="false"
+                     autocomplete="off" autocapitalize="off"
+                     placeholder="http://umbrel.local:3006"
+                     aria-label="Custom explorer base URL" />
+              <div id="set-exp-msg" class="set-msg" role="status" aria-live="polite"></div>
+            </div>
+
+            <label class="set-opt">
+              <input type="radio" name="set-explorer" value="none" id="set-exp-none" />
+              <span class="set-opt-text">
+                <span class="set-opt-name">none</span>
+                <span class="set-opt-note">no outbound links &middot; heights stay plain text</span>
+              </span>
+            </label>
+          </fieldset>
+        </div>
       </div>
     </div>
 

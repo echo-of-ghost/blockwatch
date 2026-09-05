@@ -119,6 +119,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') contextMenu.
 terminalDrawer.init();
 contextMenu.initGlobal();
 shortcutsOverlay.init();
+settingsOverlay.init();
 // Primary: globalShortcut in main relays via IPC → preload → document CustomEvent
 document.addEventListener('terminal:toggle', () => terminalDrawer.toggle());
 // Fallback: direct keydown
@@ -131,15 +132,21 @@ document.addEventListener('keydown', e => {
 // one badge for the terminal and one for the shortcuts sheet that documents it.
 $('terminal-btn')?.addEventListener('click', () => terminalDrawer.toggle());
 $('shortcuts-btn')?.addEventListener('click', () => shortcutsOverlay.toggle());
+$('settings-btn')?.addEventListener('click', () => settingsOverlay.toggle());
 
 // Typing in a field must never be hijacked — "?" is a character there.
 function _typingInField(t) {
   return !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
 }
+// Whichever sheet is open owns Escape and Tab. Settings is checked first
+// because it can be opened from the shortcuts sheet's own trigger.
 document.addEventListener('keydown', e => {
-  if (shortcutsOverlay.isOpen()) {
-    if (e.key === 'Escape') { e.preventDefault(); shortcutsOverlay.close(); return; }
-    shortcutsOverlay._trapFocus(e);
+  const openSheet = settingsOverlay.isOpen() ? settingsOverlay
+                  : shortcutsOverlay.isOpen() ? shortcutsOverlay
+                  : null;
+  if (openSheet) {
+    if (e.key === 'Escape') { e.preventDefault(); openSheet.close(); return; }
+    openSheet._trapFocus(e);
     return;
   }
   if (e.key === '?' && !e.ctrlKey && !e.metaKey && !e.altKey && !_typingInField(e.target)) {
