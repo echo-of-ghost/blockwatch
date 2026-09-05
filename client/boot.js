@@ -118,11 +118,34 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') contextMenu.
 // Terminal drawer
 terminalDrawer.init();
 contextMenu.initGlobal();
+shortcutsOverlay.init();
 // Primary: globalShortcut in main relays via IPC → preload → document CustomEvent
 document.addEventListener('terminal:toggle', () => terminalDrawer.toggle());
 // Fallback: direct keydown
 document.addEventListener('keydown', e => {
   if (e.ctrlKey && e.key === '`') { e.preventDefault(); terminalDrawer.toggle(); }
+});
+
+// ── Discoverability ─────────────────────────────────────────────────────────
+// Almost everything powerful in this app is invisible, so the titlebar carries
+// one badge for the terminal and one for the shortcuts sheet that documents it.
+$('terminal-btn')?.addEventListener('click', () => terminalDrawer.toggle());
+$('shortcuts-btn')?.addEventListener('click', () => shortcutsOverlay.toggle());
+
+// Typing in a field must never be hijacked — "?" is a character there.
+function _typingInField(t) {
+  return !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
+}
+document.addEventListener('keydown', e => {
+  if (shortcutsOverlay.isOpen()) {
+    if (e.key === 'Escape') { e.preventDefault(); shortcutsOverlay.close(); return; }
+    shortcutsOverlay._trapFocus(e);
+    return;
+  }
+  if (e.key === '?' && !e.ctrlKey && !e.metaKey && !e.altKey && !_typingInField(e.target)) {
+    e.preventDefault();
+    shortcutsOverlay.open();
+  }
 });
 
 // Peer table click delegation

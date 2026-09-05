@@ -50,9 +50,24 @@
               id="snapshot-btn"
               class="ph-tsv-btn snapshot-btn"
               aria-label="Download JSON snapshot"
+              title="Download a JSON snapshot of current state"
             >
               snapshot ↓
             </button>
+            <button
+              type="button"
+              id="terminal-btn"
+              class="tb-sound-badge"
+              aria-label="Open terminal"
+              title="Open the node terminal  (Ctrl+`)"
+            >›</button>
+            <button
+              type="button"
+              id="shortcuts-btn"
+              class="tb-sound-badge"
+              aria-label="Keyboard shortcuts"
+              title="Keyboard shortcuts  (?)"
+            >?</button>
             <button
               type="button"
               id="sound-btn"
@@ -134,7 +149,7 @@
         <!-- DATA PANELS — draggable, resizable -->
 
         <div class="panel" data-panel="node">
-          <div class="ph">
+          <div class="ph" title="Drag to reorder · right-click for options">
             <svg
               class="ph-drag-icon"
               viewBox="0 0 6 10"
@@ -215,7 +230,7 @@
             <div class="kv ni-kv-cfg" id="ni-utxo-row">
               <span class="k">utxo set</span
               ><span class="v" id="ni-utxo"
-                ><button type="button" class="la-toggle" id="ni-utxo-btn" aria-label="Fetch UTXO set info">fetch</button></span
+                ><button type="button" class="la-toggle" id="ni-utxo-btn" aria-label="Fetch UTXO set info" title="Scan the UTXO set (can take minutes)">fetch</button></span
               >
             </div>
             <div
@@ -256,7 +271,7 @@
                 type="button"
                 class="la-toggle"
                 id="la-reveal-btn"
-                aria-label="Toggle local address visibility"
+                aria-label="Toggle local address visibility" title="Reveal local addresses"
               >
                 reveal
               </button>
@@ -266,7 +281,7 @@
         </div>
 
         <div class="panel" id="p-col2-top" data-panel="chain">
-          <div class="ph">
+          <div class="ph" title="Drag to reorder · right-click for options">
             <svg
               class="ph-drag-icon"
               viewBox="0 0 6 10"
@@ -315,7 +330,7 @@
         </div>
 
         <div class="panel" id="p-col2-subsidy" data-panel="mempool-viz">
-          <div class="ph">
+          <div class="ph" title="Drag to reorder · right-click for options">
             <svg
               class="ph-drag-icon"
               viewBox="0 0 6 10"
@@ -339,7 +354,7 @@
         </div>
 
         <div class="panel" id="p-col2-mid" data-panel="block-timing">
-          <div class="ph">
+          <div class="ph" title="Drag to reorder · right-click for options">
             <svg
               class="ph-drag-icon"
               viewBox="0 0 6 10"
@@ -369,7 +384,7 @@
         </div>
 
         <div class="panel" id="p-col3-top" data-panel="blocks">
-          <div class="ph">
+          <div class="ph" title="Drag to reorder · right-click for options">
             <svg
               class="ph-drag-icon"
               viewBox="0 0 6 10"
@@ -390,7 +405,7 @@
                 type="button"
                 id="blocks-tsv-btn"
                 class="ph-tsv-btn"
-                aria-label="Export blocks as TSV"
+                aria-label="Export blocks as TSV" title="Export blocks as TSV"
               >blocks ↓</button></span
             >
           </div>
@@ -411,7 +426,7 @@
         </div>
 
         <div class="panel" id="p-col3-mid" data-panel="block-detail">
-          <div class="ph">
+          <div class="ph" title="Drag to reorder · right-click for options">
             <svg
               class="ph-drag-icon"
               viewBox="0 0 6 10"
@@ -434,7 +449,7 @@
         </div>
 
         <div class="panel" id="p-col3-bot" data-panel="mining">
-          <div class="ph">
+          <div class="ph" title="Drag to reorder · right-click for options">
             <svg
               class="ph-drag-icon"
               viewBox="0 0 6 10"
@@ -523,7 +538,7 @@
         </div>
 
         <div class="panel" id="p-col4-top" data-panel="peers">
-          <div class="ph">
+          <div class="ph" title="Drag to reorder · right-click for options">
             <svg
               class="ph-drag-icon"
               viewBox="0 0 6 10"
@@ -546,7 +561,7 @@
                 type="button"
                 id="peers-tsv-btn"
                 class="ph-tsv-btn"
-                aria-label="Export peers as TSV"
+                aria-label="Export peers as TSV" title="Export peers as TSV"
               >
                 peers ↓
               </button></span
@@ -578,7 +593,7 @@
         </div>
 
         <div class="panel" id="p-col4-svc" data-panel="services">
-          <div class="ph">
+          <div class="ph" title="Drag to reorder · right-click for options">
             <svg
               class="ph-drag-icon"
               viewBox="0 0 6 10"
@@ -599,7 +614,7 @@
         </div>
 
         <div class="panel" id="p-col4-bot" data-panel="peer-detail">
-          <div class="ph">
+          <div class="ph" title="Drag to reorder · right-click for options">
             <svg
               class="ph-drag-icon"
               viewBox="0 0 6 10"
@@ -684,7 +699,7 @@
           id="conn-retry"
           style="display: none"
           aria-label="Retry connection"
-        >
+         title="Retry the connection now">
           retry now
         </button>
       </div>
@@ -707,6 +722,19 @@
     <!-- CONTEXT MENU -->
     <div id="ctx-menu" style="display: none"></div>
 
+    <!-- Keyboard shortcuts and hidden interactions. Content is built in
+         client/ui.js so the list lives beside the code that implements it. -->
+    <div id="shortcuts" class="sc-overlay" style="display: none" role="dialog"
+         aria-modal="true" aria-labelledby="sc-title" tabindex="-1">
+      <div class="sc-sheet">
+        <div class="sc-head">
+          <h2 class="sc-title" id="sc-title">Shortcuts &amp; hidden features</h2>
+          <button type="button" id="sc-close" class="sc-close" aria-label="Close shortcuts" title="Close  (Esc)">×</button>
+        </div>
+        <div class="sc-body" id="sc-body"></div>
+      </div>
+    </div>
+
     <!-- TERMINAL DRAWER (Electron only — activated by Ctrl+`) -->
     <div id="terminal-drawer" role="complementary" aria-label="Bitcoin node terminal" style="display:none">
       <div id="term-resize" class="term-resize" role="separator" aria-label="Resize terminal" aria-orientation="horizontal"></div>
@@ -715,11 +743,11 @@
         <span id="term-node" class="term-node"></span>
         <span id="term-status" class="term-status"></span>
         <div class="term-actions">
-          <button id="term-tobottom" class="term-close-btn" type="button" style="display:none" aria-label="Scroll to newest">↓</button>
-          <button id="term-copy" class="term-close-btn" type="button" aria-label="Copy all output">⎘</button>
-          <button id="term-clear" class="term-close-btn" type="button" aria-label="Clear output">⌫</button>
-          <button id="term-maximize" class="term-close-btn" type="button" aria-label="Maximize terminal">⤢</button>
-          <button id="term-close" class="term-close-btn" type="button" aria-label="Close terminal">×</button>
+          <button id="term-tobottom" class="term-close-btn" type="button" style="display:none" aria-label="Scroll to newest" title="Scroll to newest">↓</button>
+          <button id="term-copy" class="term-close-btn" type="button" aria-label="Copy all output" title="Copy all output">⎘</button>
+          <button id="term-clear" class="term-close-btn" type="button" aria-label="Clear output" title="Clear output  (Ctrl+L)">⌫</button>
+          <button id="term-maximize" class="term-close-btn" type="button" aria-label="Maximize terminal" title="Maximize terminal">⤢</button>
+          <button id="term-close" class="term-close-btn" type="button" aria-label="Close terminal" title="Close terminal  (Esc)">×</button>
         </div>
       </div>
       <div id="term-search" class="term-search" style="display:none">
@@ -727,9 +755,9 @@
         <input id="term-search-input" class="term-search-input" type="text"
           autocomplete="off" spellcheck="false" placeholder="search output" aria-label="Search terminal output" />
         <span id="term-search-count" class="term-search-count"></span>
-        <button id="term-search-prev" class="term-close-btn" type="button" aria-label="Previous match">↑</button>
-        <button id="term-search-next" class="term-close-btn" type="button" aria-label="Next match">↓</button>
-        <button id="term-search-close" class="term-close-btn" type="button" aria-label="Close search">×</button>
+        <button id="term-search-prev" class="term-close-btn" type="button" aria-label="Previous match" title="Previous match  (Shift+Enter)">↑</button>
+        <button id="term-search-next" class="term-close-btn" type="button" aria-label="Next match" title="Next match  (Enter)">↓</button>
+        <button id="term-search-close" class="term-close-btn" type="button" aria-label="Close search" title="Close search">×</button>
       </div>
       <div id="term-output" class="term-output" tabindex="0"></div>
       <div id="term-candidates" class="term-candidates" style="display:none"></div>
