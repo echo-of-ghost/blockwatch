@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [3.0.0] - 2026-09-06
 
 ### Changed
 - **A fluid spatial layout engine replaces the classic panel drag.** Panels no longer wait for a drop: the solver removes the dragged panel and reinserts it where the pointer implies on every frame, so the arrangement on screen *is* the arrangement that will be committed. Releasing does not choose anything, it stops updating, which is what removes ghosts, insert lines and drop zones entirely. Neighbours flow out of the way with locality-weighted damping, and the dragged panel narrows or widens toward its destination column's width so the outcome is legible without decoration. Resize goes through the same solver, so it cascades the same way. Adds keyboard reordering and resizing, which the dashboard never had. Measured at p50 16.7ms and p95 16.8ms across a 1.6s four-column drag. This replaces the classic drag, resize and swap code rather than sitting behind a flag: 448 lines of it are deleted, and `ui.js` calls the engine directly instead of being monkey-patched.

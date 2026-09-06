@@ -45,8 +45,8 @@ Uses Bitcoin Core's native ZMQ for real-time block notifications, with a 10-seco
 blockwatch ships as a self-contained Linux desktop application. Download the latest `.AppImage` from the [releases page](https://github.com/echo-of-ghost/blockwatch/releases), make it executable, and run it — no installation required.
 
 ```bash
-chmod +x Blockwatch-2.5.0.AppImage
-./Blockwatch-2.5.0.AppImage
+chmod +x Blockwatch-3.0.0.AppImage
+./Blockwatch-3.0.0.AppImage
 ```
 
 The app embeds a Node.js server and opens directly to the dashboard. All configuration (cookie auth, ZMQ, environment variables) works the same as described below.
@@ -86,7 +86,7 @@ gpg --fingerprint maplehodl@protonmail.com
 
 **3. Verify:**
 ```bash
-gpg --verify Blockwatch-2.5.0.AppImage.asc Blockwatch-2.5.0.AppImage
+gpg --verify Blockwatch-3.0.0.AppImage.asc Blockwatch-3.0.0.AppImage
 ```
 
 A good signature looks like:
