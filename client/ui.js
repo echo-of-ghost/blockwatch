@@ -164,7 +164,15 @@ const layout = {
   },
 
   // ── Core render: lay out all columns from _cols state ────────────────────────
+  // Placement is owned by the fluid engine (client/fluid.js), which animates
+  // toward the layout this module decides. _renderPanels is the direct writer
+  // it falls back to when the engine is unavailable or disengaged.
   _render() {
+    if (typeof fluid !== "undefined" && fluid.active) return fluid.request();
+    this._renderPanels();
+  },
+
+  _renderPanels() {
     if (this._isTablet() || this._isMobile) return;
     const G = this.GAP;
     const da = this._dataArea();
@@ -220,8 +228,6 @@ const layout = {
       if (name === "titlebar" || name === "hero" || name === "statusbar")
         return;
       this._addHandles(p);
-      this._initDrag(p);
-      this._initResize(p);
       this._initClose(p);
       p.style.display = "none";
     });
@@ -283,10 +289,8 @@ const layout = {
     if (!this._panelObs) {
       this._panelObs = new MutationObserver(() => {
         this._allPanels().forEach((p) => {
-          if (p._lv17 && p._dragInit && p._rr && p._cc) return;
+          if (p._lv17 && p._cc) return;
           this._addHandles(p);
-          this._initDrag(p);
-          this._initResize(p);
           this._initClose(p);
         });
       });
@@ -347,477 +351,6 @@ const layout = {
     });
   },
 
-  // ── Drag — insert into column or swap with panel ─────────────────────────
-  // _findColumnInsert returns a descriptor for edge/gap zones (insert line shown).
-  // When the cursor is in a panel's centre zone it returns null, which triggers
-  // swap detection. A single-panel column behaves identically to a multi-panel
-  // column: centre = swap, top/bottom edges = insert before/after.
-  _initDrag(panel) {
-    if (panel._dragInit) return;
-    panel._dragInit = true;
-
-    panel.addEventListener(
-      "pointerdown",
-      (e) => {
-        if (!this._isMobile && !e.target.closest(".resize-handle"))
-          this._bringToFront(panel);
-      },
-      true,
-    );
-
-    const ph = panel.querySelector(".ph");
-    if (!ph) return;
-
-    ph.addEventListener("mouseenter", () =>
-      panel.classList.add("panel-ph-hover"),
-    );
-    ph.addEventListener("mouseleave", () =>
-      panel.classList.remove("panel-ph-hover"),
-    );
-
-    ph.addEventListener("pointerdown", (e) => {
-      if (
-        e.target.closest(".ph-right") ||
-        e.target.closest(".resize-handle") ||
-        this._isMobile ||
-        this._isTablet()
-      )
-        return;
-      if (e.pointerType === "touch" && e.isPrimary === false) return;
-      e.preventDefault();
-      ph.setPointerCapture(e.pointerId);
-
-      // Clean up any orphaned ghosts left by a previous drag that lost its pointer event
-      this._main.querySelectorAll('.drop-ghost, .drop-insert-line').forEach(el => el.remove());
-
-      const l0 = parseInt(panel.style.left) || 0;
-      const t0 = parseInt(panel.style.top) || 0;
-      const W = panel.offsetWidth;
-      const H = panel.offsetHeight;
-      // Capture where within the panel the user clicked, so dragging feels natural
-      const panelRect = panel.getBoundingClientRect();
-      const grabOffsetX = e.clientX - panelRect.left;
-      const grabOffsetY = e.clientY - panelRect.top;
-      let moved = false;
-      let swapGhost = null; // box ghost shown over swap target
-      let insertLine = null; // line ghost shown for insert position
-      let overTarget = null; // panel to swap with
-      let insertDrop = null; // { ci, insertIndex } for column insert
-
-      const mv = (ev) => {
-        if (ev.pointerId !== e.pointerId) return;
-        if (
-          !moved &&
-          Math.hypot(ev.clientX - e.clientX, ev.clientY - e.clientY) < 5
-        )
-          return;
-
-        if (!moved) {
-          moved = true;
-          panel.classList.add("panel-dragging");
-          panel.classList.remove("panel-ph-hover");
-          document.body.classList.add("is-dragging");
-          document.body.style.cursor = "grabbing";
-          panel.style.willChange = "transform";
-
-          swapGhost = document.createElement("div");
-          swapGhost.className = "drop-ghost drop-ghost-swap";
-          swapGhost.style.cssText =
-            "position:absolute;pointer-events:none;display:none;";
-          this._main.appendChild(swapGhost);
-
-          insertLine = document.createElement("div");
-          insertLine.className = "drop-insert-line";
-          insertLine.style.cssText =
-            "position:absolute;pointer-events:none;display:none;";
-          this._main.appendChild(insertLine);
-        }
-
-        const mainRect = this._main.getBoundingClientRect();
-        const rawL = ev.clientX - mainRect.left - grabOffsetX;
-        const rawT = ev.clientY - mainRect.top - grabOffsetY;
-        const da = this._dataArea();
-        const clampL = Math.max(
-          da.left,
-          Math.min(da.left + da.width - W, rawL),
-        );
-        const clampT = Math.max(da.top, Math.min(da.top + da.height - H, rawT));
-        panel.style.transform = `translate(${clampL - l0}px,${clampT - t0}px)`;
-
-        const cx = ev.clientX - mainRect.left;
-        const cy = ev.clientY - mainRect.top;
-
-        // _findColumnInsert claims edge zones and returns null for centre zones.
-        // A null result means swap detection gets to run below.
-        insertDrop =
-          cy >= da.top && cy <= da.top + da.height
-            ? this._findColumnInsert(cx, cy, panel.dataset.panel, da)
-            : null;
-
-        // Swap target: cursor is in a panel's centre zone (insertDrop is null).
-        overTarget = null;
-        if (!insertDrop) {
-          this._allPanels().forEach((p) => {
-            if (p === panel) return;
-            if (["titlebar", "hero", "statusbar"].includes(p.dataset.panel))
-              return;
-            if (this._minimized.has(p) || p.style.display === "none") return;
-            const pl = parseInt(p.style.left),
-              pt = parseInt(p.style.top);
-            if (
-              cx >= pl &&
-              cx <= pl + p.offsetWidth &&
-              cy >= pt &&
-              cy <= pt + p.offsetHeight
-            ) {
-              overTarget = p;
-            }
-          });
-        }
-
-        // Update ghosts — swap ghost for centre zone, insert line for edges/gaps.
-        if (overTarget) {
-          swapGhost.style.cssText = `position:absolute;pointer-events:none;
-            left:${overTarget.style.left};top:${overTarget.style.top};
-            width:${overTarget.offsetWidth}px;height:${overTarget.offsetHeight}px;`;
-          swapGhost.style.display = "";
-          insertLine.style.display = "none";
-        } else if (insertDrop) {
-          swapGhost.style.display = "none";
-          const { lineX, lineW, lineY } = insertDrop;
-          insertLine.style.cssText = `position:absolute;pointer-events:none;
-            left:${lineX}px;top:${lineY - 1}px;width:${lineW}px;height:2px;`;
-          insertLine.style.display = "";
-        } else {
-          swapGhost.style.display = "none";
-          insertLine.style.display = "none";
-        }
-      };
-
-      const up = (ev) => {
-        if (ev.pointerId !== e.pointerId) return;
-        ph.removeEventListener("pointermove", mv);
-        ph.removeEventListener("pointerup", up);
-        ph.removeEventListener("pointercancel", up);
-        document.body.style.cursor = "";
-        document.body.classList.remove("is-dragging");
-        panel.classList.remove("panel-dragging");
-        panel.style.transform = "";
-        panel.style.willChange = "";
-        if (swapGhost) {
-          swapGhost.remove();
-          swapGhost = null;
-        }
-        if (insertLine) {
-          insertLine.remove();
-          insertLine = null;
-        }
-
-        if (moved && overTarget) {
-          this._swapPanels(panel.dataset.panel, overTarget.dataset.panel);
-        } else if (moved && insertDrop) {
-          this._insertPanel(
-            panel.dataset.panel,
-            insertDrop.ci,
-            insertDrop.insertIndex,
-          );
-        } else if (moved) {
-          panel.classList.add("panel-swapping");
-          Object.assign(panel.style, { left: l0 + "px", top: t0 + "px" });
-          setTimeout(() => panel.classList.remove("panel-swapping"), 260);
-        }
-      };
-
-      ph.addEventListener("pointermove", mv);
-      ph.addEventListener("pointerup", up);
-      ph.addEventListener("pointercancel", up);
-    });
-  },
-
-  // Returns a drop target descriptor for edge/gap zones, or null for centre zones.
-  // Edge zones (top/bottom 22% of a panel) → insert before/after.
-  // Centre zone → null, letting swap detection handle it (works for any column size).
-  // Gaps between panels (including phantom space from hidden panels) → insert at
-  // the boundary of the nearest panel using top-edge comparison, not midpoint.
-  // { ci, insertIndex, lineX, lineW, lineY }
-  _findColumnInsert(cx, cy, dragName, da) {
-    const G = this.GAP;
-    const nCols = this.COL_WF.length;
-    const EDGE_ZONE = 0.22;
-
-    for (let ci = 0; ci < nCols; ci++) {
-      const { x: colX, w: colW } = this._colGeom(ci, da);
-
-      if (cx < colX || cx > colX + colW) continue;
-
-      // Exclude the dragging panel — its slot still exists but shouldn't
-      // influence index or geometry decisions.
-      const active = this._activePanels(ci).filter((s) => s.name !== dragName);
-
-      // Check each panel for an edge-zone or centre-zone hit.
-      for (let i = 0; i < active.length; i++) {
-        const p = this._panel(active[i].name);
-        if (!p) continue;
-        const pt = parseInt(p.style.top);
-        const ph = p.offsetHeight;
-        if (cy < pt || cy > pt + ph) continue;
-
-        // Cursor is on this panel.
-        const edgePx = Math.max(32, ph * EDGE_ZONE);
-
-        if (cy <= pt + edgePx) {
-          // Top edge → insert before.
-          const lineY = i === 0 ? da.top : pt - Math.round(G / 2);
-          return { ci, insertIndex: i, lineX: colX, lineW: colW, lineY };
-        }
-
-        if (cy >= pt + ph - edgePx) {
-          // Bottom edge → insert after.
-          const lineY =
-            i === active.length - 1
-              ? da.top + da.height
-              : pt + ph + Math.round(G / 2);
-          return { ci, insertIndex: i + 1, lineX: colX, lineW: colW, lineY };
-        }
-
-        // Centre zone — return null so swap detection fires.
-        return null;
-      }
-
-      // Cursor is in the column but not on any panel (gap or empty column).
-      // Use panel top-edges as boundaries — avoids phantom-space issues when
-      // a hidden panel leaves the remaining panel not at da.top.
-      if (active.length === 0) {
-        return { ci, insertIndex: 0, lineX: colX, lineW: colW, lineY: da.top };
-      }
-
-      for (let i = 0; i < active.length; i++) {
-        const p = this._panel(active[i].name);
-        if (!p) continue;
-        const pt = parseInt(p.style.top);
-        if (cy < pt) {
-          // Above this panel — insert before it.
-          const lineY = i === 0 ? da.top : pt - Math.round(G / 2);
-          return { ci, insertIndex: i, lineX: colX, lineW: colW, lineY };
-        }
-      }
-
-      // Below all panels — append at end.
-      const last = this._panel(active[active.length - 1].name);
-      const lastBottom = last
-        ? parseInt(last.style.top) + last.offsetHeight
-        : da.top + da.height;
-      return {
-        ci,
-        insertIndex: active.length,
-        lineX: colX,
-        lineW: colW,
-        lineY: lastBottom + Math.round(G / 2),
-      };
-    }
-
-    return null;
-  },
-
-  // Move a panel from its current column into targetCol at insertIndex.
-  // insertIndex is relative to the active (visible) panels in the target column —
-  // it must be translated to a raw _cols index that accounts for hidden panels.
-  _insertPanel(name, targetCi, insertIndex) {
-    // Find and remove from source column.
-    let srcCi = -1,
-      srcSlot = null;
-    for (let ci = 0; ci < this._cols.length; ci++) {
-      const idx = this._cols[ci].findIndex((s) => s.name === name);
-      if (idx !== -1) {
-        srcCi = ci;
-        srcSlot = this._cols[ci].splice(idx, 1)[0];
-        break;
-      }
-    }
-    if (srcCi === -1 || !srcSlot) return;
-
-    // Redistribute the departed panel's hf to its former active column-mates.
-    const srcActive = this._activePanels(srcCi);
-    if (srcActive.length) {
-      const share = srcSlot.hf / srcActive.length;
-      srcActive.forEach((s) => {
-        s.hf += share;
-      });
-    }
-
-    // Translate insertIndex (relative to active panels) into a raw _cols index.
-    // We find the raw position of the insertIndex-th active panel and insert
-    // before it; if insertIndex is past all active panels we append at the end.
-    const targetCol = this._cols[targetCi];
-    const targetActive = this._activePanels(targetCi);
-    let rawIndex;
-    if (insertIndex >= targetActive.length) {
-      // Append after the last slot in the column.
-      rawIndex = targetCol.length;
-    } else {
-      // Insert before the insertIndex-th active panel.
-      const anchorName = targetActive[insertIndex].name;
-      rawIndex = targetCol.findIndex((s) => s.name === anchorName);
-      if (rawIndex === -1) rawIndex = targetCol.length;
-    }
-
-    // Claim an equal share of the target column's active height.
-    const nActive = targetActive.length;
-    const newHf = nActive ? 1 / (nActive + 1) : 1;
-    const scaleFactor = nActive ? nActive / (nActive + 1) : 1;
-    targetActive.forEach((s) => {
-      s.hf *= scaleFactor;
-    });
-
-    targetCol.splice(rawIndex, 0, { name, hf: newHf });
-
-    const p = this._panel(name);
-    if (p) p.classList.add("panel-swapping");
-
-    this._render();
-    this._save();
-
-    setTimeout(() => {
-      if (p) p.classList.remove("panel-swapping");
-    }, 260);
-  },
-
-  // Swap two named panels in _cols — each keeps the other's hf so column
-  // proportions stay stable.
-  _swapPanels(nameA, nameB) {
-    let slotA = null,
-      ciA = -1,
-      iiA = -1;
-    let slotB = null,
-      ciB = -1,
-      iiB = -1;
-
-    this._cols.forEach((col, ci) => {
-      col.forEach((slot, ii) => {
-        if (slot.name === nameA) {
-          slotA = slot;
-          ciA = ci;
-          iiA = ii;
-        }
-        if (slot.name === nameB) {
-          slotB = slot;
-          ciB = ci;
-          iiB = ii;
-        }
-      });
-    });
-
-    if (!slotA || !slotB) return;
-
-    this._cols[ciA][iiA] = { name: nameB, hf: slotA.hf };
-    this._cols[ciB][iiB] = { name: nameA, hf: slotB.hf };
-
-    const pA = this._panel(nameA);
-    const pB = this._panel(nameB);
-    if (pA) pA.classList.add("panel-swapping");
-    if (pB) pB.classList.add("panel-swapping");
-
-    this._render();
-    this._save();
-
-    setTimeout(() => {
-      if (pA) pA.classList.remove("panel-swapping");
-      if (pB) pB.classList.remove("panel-swapping");
-    }, 260);
-  },
-
-  // ── Resize — south edge only, adjusts panel below ───────────────────────────
-  _initResize(panel) {
-    if (panel._rr) return;
-    panel._rr = true;
-
-    panel.querySelectorAll(".resize-handle").forEach((handle) => {
-      const dir = handle.dataset.dir;
-      if (dir !== "s" && dir !== "n") return;
-
-      handle.addEventListener("pointerdown", (e) => {
-        if (this._isMobile || this._isTablet()) return;
-        e.preventDefault();
-        e.stopPropagation();
-        handle.setPointerCapture(e.pointerId);
-        this._bringToFront(panel);
-
-        const name = panel.dataset.panel;
-        const y0 = e.clientY;
-        const h0 = panel.offsetHeight;
-
-        document.body.style.cursor = "ns-resize";
-        document.body.classList.add("is-dragging");
-        panel.classList.add("panel-resizing");
-
-        let ci = -1;
-        this._cols.forEach((col, c) => {
-          col.forEach((slot) => {
-            if (slot.name === name) ci = c;
-          });
-        });
-        if (ci === -1) return;
-
-        const mv = (ev) => {
-          if (ev.pointerId !== e.pointerId) return;
-          const da = this._dataArea();
-          const G = this.GAP;
-          const active = this._activePanels(ci);
-          const totalH = da.height - G * (active.length - 1);
-          const sumHf = active.reduce((s, sl) => s + sl.hf, 0);
-          const ai = active.findIndex((s) => s.name === name);
-          if (ai === -1) return;
-
-          const dy = ev.clientY - y0;
-
-          if (dir === "s") {
-            // South: grow/shrink this panel, compensate the panel below
-            if (ai === active.length - 1) return;
-            const newHf = Math.min(
-              sumHf - this.MIN_HF * (active.length - 1),
-              Math.max(this.MIN_HF, ((h0 + dy) / totalH) * sumHf),
-            );
-            const nextSlot = active[ai + 1];
-            const nextNewHf = nextSlot.hf - (newHf - active[ai].hf);
-            if (nextNewHf < this.MIN_HF) return;
-            active[ai].hf = newHf;
-            nextSlot.hf = nextNewHf;
-          } else {
-            // North: grow/shrink this panel, compensate the panel above
-            if (ai === 0) return;
-            const newHf = Math.min(
-              sumHf - this.MIN_HF * (active.length - 1),
-              Math.max(this.MIN_HF, ((h0 - dy) / totalH) * sumHf),
-            );
-            const prevSlot = active[ai - 1];
-            const prevNewHf = prevSlot.hf - (newHf - active[ai].hf);
-            if (prevNewHf < this.MIN_HF) return;
-            active[ai].hf = newHf;
-            prevSlot.hf = prevNewHf;
-          }
-
-          this._render();
-        };
-
-        const up = (ev) => {
-          if (ev.pointerId !== e.pointerId) return;
-          handle.removeEventListener("pointermove", mv);
-          handle.removeEventListener("pointerup", up);
-          handle.removeEventListener("pointercancel", up);
-          document.body.style.cursor = "";
-          document.body.classList.remove("is-dragging");
-          panel.classList.remove("panel-resizing");
-          this._save();
-        };
-
-        handle.addEventListener("pointermove", mv);
-        handle.addEventListener("pointerup", up);
-        handle.addEventListener("pointercancel", up);
-      });
-    });
-  },
-
-  // ── Context menu ─────────────────────────────────────────────────────────────
   _initClose(panel) {
     if (panel._cc) return;
     panel._cc = true;
@@ -839,6 +372,9 @@ const layout = {
       this._refreshRestoreBar();
       // Redistribute minimized panel's hf evenly among remaining active panels
       this._redistributeHf(panel.dataset.panel);
+      // A hidden panel keeps a stale animated position; drop it so the next
+      // reveal re-seeds from the solver instead of flying in from nowhere.
+      if (typeof fluid !== "undefined" && fluid.active) fluid.forget(panel);
       this._render();
       this._save();
     });
@@ -867,8 +403,15 @@ const layout = {
     // Re-normalise hf so restored panel gets its share back
     this._normaliseHf();
     panel.style.position = "absolute";
-    panel.style.display = "";
-    this._render();
+    // The engine positions by transform on top of left/top:0, so revealing a
+    // panel before it has one renders it at the container origin for a frame.
+    // reveal() places it first, then shows it.
+    if (typeof fluid !== "undefined" && fluid.active) {
+      fluid.reveal(panel);
+    } else {
+      panel.style.display = "";
+      this._render();
+    }
     this._bringToFront(panel);
     this._animIn(panel);
     this._refreshRestoreBar();

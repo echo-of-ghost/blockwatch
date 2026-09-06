@@ -55,8 +55,29 @@ try {
   if (savedChain && savedChain !== 'main') chainTheme.apply(savedChain);
 } catch (_) {}
 
-// Layout
+// Layout. The fluid engine owns panel placement and interaction; layout owns
+// what the arrangement IS. engage() must run before layout.init() so the first
+// render already goes through the engine.
+let _fluidEngaged = false;
+if (typeof fluid !== 'undefined') {
+  try { _fluidEngaged = fluid.engage(); }
+  catch (e) { console.error('[fluid] engage failed', e); _fluidEngaged = false; }
+}
+
 layout.init();
+
+if (_fluidEngaged) {
+  try {
+    fluid.start();
+  } catch (e) {
+    // Disengaging returns placement to layout._renderPanels. There is no drag
+    // without the engine, but a dashboard you cannot rearrange still beats one
+    // you cannot see.
+    console.error('[fluid] start failed, falling back to direct placement', e);
+    try { fluid.disengage(); layout._render(); }
+    catch (e2) { console.error('[fluid] fallback render failed', e2); }
+  }
+}
 
 // Charts resize observers
 charts.init();

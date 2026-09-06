@@ -262,11 +262,6 @@ html, body { height: 100dvh; overflow: hidden; background: var(--void); color: v
   min-width: 0; min-height: 0;
   z-index: 10;
 }
-.panel.panel-ph-hover {
-  box-shadow:
-    inset 0 1px 0 rgba(var(--orange-rgb), .20),
-    var(--shadow-hover);
-}
 .panel.panel-focused {
   z-index: 20;
   box-shadow:
@@ -989,12 +984,35 @@ a.ext-link:hover { color: var(--orange); }
 /* ── Restore bar — lives in titlebar .tr ── */
 #restore-bar {
   display: flex; align-items: center; gap: var(--sp-4);
+  /* Was overflow:hidden, which silently clipped chips past 40vw and left those
+     panels with no way back at all — hide nine panels at 1280px and two of them
+     became unrecoverable. Scrolling keeps every chip reachable, and the fade on
+     .rb-inner says there are more. */
   overflow: hidden; max-width: 40vw;
 }
 #restore-bar.rb-empty { display: none; }
 #restore-bar.rb-empty + .rb-sep { display: none; }
 /* chips have their own ↑ prefix */
-.rb-inner { display: flex; align-items: center; gap: var(--sp-4); overflow: hidden; }
+.rb-inner {
+  display: flex; align-items: center; gap: var(--sp-4);
+  overflow-x: auto; overflow-y: hidden;
+  scrollbar-width: none; /* the fade is the affordance; a scrollbar here is noise */
+  scroll-behavior: smooth;
+}
+.rb-inner::-webkit-scrollbar { display: none; }
+/* Fades only while there is something to scroll to, set by the class below. */
+.rb-inner.rb-more {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 22px), transparent 100%);
+  mask-image: linear-gradient(to right, #000 calc(100% - 22px), transparent 100%);
+}
+.rb-inner.rb-more-start {
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 22px);
+  mask-image: linear-gradient(to right, transparent 0, #000 22px);
+}
+.rb-inner.rb-more.rb-more-start {
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 22px, #000 calc(100% - 22px), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 22px, #000 calc(100% - 22px), transparent 100%);
+}
 .rb-chip {
   display: inline-flex; align-items: center;
   padding: var(--sp-2) var(--sp-6); gap: var(--sp-4);
@@ -1022,12 +1040,6 @@ a.ext-link:hover { color: var(--orange); }
 }
 
 /* ── Swap animation ── */
-.panel-swapping {
-  transition: left 240ms cubic-bezier(.25,0,.2,1),
-              top  240ms cubic-bezier(.25,0,.2,1),
-              width  240ms cubic-bezier(.25,0,.2,1),
-              height 240ms cubic-bezier(.25,0,.2,1) !important;
-}
 
 /* ── Panel being dragged — follows cursor, semi-transparent, lifted ── */
 .panel.panel-dragging {
@@ -1042,37 +1054,8 @@ a.ext-link:hover { color: var(--orange); }
 }
 
 /* ── Tiling drag: destination slot ghost — t3-grey border, barely-there tint ── */
-.drop-ghost {
-  position: absolute; pointer-events: none; z-index: 50;
-  border-radius: var(--radius);
-  border: 1px dashed rgba(104,104,104,.5);
-  background: rgba(104,104,104,.05);
-  transition: left .06s ease, top .06s ease, width .06s ease, height .06s ease;
-}
 
 /* ── Column insert indicator: t3-grey bar with vertical end-caps ── */
-.drop-insert-line {
-  position: absolute; pointer-events: none; z-index: 51;
-  height: 0;
-  border-top: 1px dashed rgba(104,104,104,.7);
-  transition: top .07s ease;
-}
-.drop-insert-line::before {
-  content: '';
-  position: absolute;
-  top: -3px; left: 0;
-  width: 1px; height: 7px;
-  border-radius: var(--radius);
-  background: rgba(104,104,104,.8);
-}
-.drop-insert-line::after {
-  content: '';
-  position: absolute;
-  top: -3px; right: 0;
-  width: 1px; height: 7px;
-  border-radius: var(--radius);
-  background: rgba(104,104,104,.8);
-}
 /* ── Snap-grid overlay while dragging ── */
 .is-dragging #main::before {
   content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 1;
@@ -2264,3 +2247,74 @@ body.term-resizing { user-select: none; cursor: ns-resize; }
 
 /* A block hash with no explorer configured is still the hash, just not a link. */
 .bd-hash-plain { color: var(--t2); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FLUID LAYOUT ENGINE (experimental — client/fluid.js)
+   Positions come from transforms written by the engine each frame. Nothing
+   here animates: easing is integrated in JS so it can be locality-weighted
+   and interrupted mid-flight, which a CSS transition cannot do.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Panels resize continuously during a manipulation. `contain` stops each
+   panel's internal relayout from escaping into its siblings, which is what
+   keeps a ten-panel reflow bounded rather than quadratic. */
+/* `layout` only, never `paint`: the resize handles sit at bottom:-4px / top:-4px,
+   half outside the panel box, and paint containment clips them out of existence
+   for hit testing as well as for rendering. */
+.fluid-on .panel { contain: layout; will-change: auto; }
+
+/* Only the panels actually in motion get promoted, and only while moving.
+   Promoting all of them permanently would cost memory for no gain. */
+.fluid-active .panel { will-change: transform; }
+
+.fluid-on .panel.fluid-dragging {
+  z-index: 60;
+  cursor: grabbing;
+  /* Lifted, not tilted or scaled: the panel stays exactly the size it will be
+     when released, so the destination is readable rather than theatrical. */
+  box-shadow: var(--shadow-drag);
+}
+.fluid-on .panel.fluid-dragging .ph { cursor: grabbing; }
+.fluid-on .panel.fluid-resizing { z-index: 55; }
+
+/* The classic spawn/out animations animate `transform`, and a CSS animation
+   outranks an inline style. In this engine position IS the inline transform, so
+   those keyframes replace it with a bare scale and drop the panel to the
+   container origin for the length of the animation — the top-left snap on
+   hide and restore. Here they fade only, and the engine keeps the transform. */
+@keyframes fluid-in  { from { opacity: 0 } to { opacity: 1 } }
+@keyframes fluid-out { from { opacity: 1 } to { opacity: 0 } }
+.fluid-on .p-spawn   { animation: fluid-in  .20s ease both; }
+.fluid-on .p-restore { animation: fluid-in  .16s ease both; }
+.fluid-on .p-out     { animation: fluid-out .16s ease both; pointer-events: none; }
+
+/* Everything except the panel under the pointer stops taking events during a
+   manipulation, so a fast drag cannot land on a table row mid-flight. */
+.fluid-active .panel:not(.fluid-dragging):not(.fluid-resizing) { pointer-events: none; }
+.fluid-active { cursor: grabbing; user-select: none; }
+
+/* The header is the grab surface and a keyboard control, so it says so. */
+.fluid-on .ph { cursor: grab; touch-action: none; }
+.fluid-on .ph:focus-visible {
+  outline: 1px solid var(--orange);
+  outline-offset: -1px;
+  border-radius: var(--radius);
+}
+
+/* Resize handles. `.panel` is overflow:hidden, so the classic handles at
+   bottom:-4px / top:-4px have half their height clipped away and only about
+   4px is actually hittable. The south handle is pulled fully inside and made
+   generous; the north one is left alone because at top:0 it would sit on the
+   header, and the header is the drag surface — a boundary is resized from the
+   bottom edge of the panel above it, which keeps drag and resize unambiguous. */
+.fluid-on .resize-handle { touch-action: none; }
+.fluid-on .panel .resize-s { bottom: 0; height: 10px; }
+@media (pointer: coarse) {
+  .fluid-on .panel .resize-s { height: 18px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The engine already snaps rather than eases when this is set; the shadow is
+     the only remaining motion cue, so it goes too. */
+  .fluid-on .panel.fluid-dragging { box-shadow: var(--shadow-hover); }
+}
