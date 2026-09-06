@@ -735,7 +735,10 @@ a.ext-link:hover { color: var(--orange); }
 
 .pd-tag { font-size: var(--fs-xs); color: var(--t3); background: var(--surface); padding: var(--sp-2) var(--sp-4); border-radius: var(--radius); }
 .pd-svc { display: flex; flex-wrap: wrap; gap: var(--sp-4); padding: var(--sp-2) 0; }
-.pd-svc span { font-size: var(--fs-xs); font-weight: 600; letter-spacing: .05em; font-family: var(--mono); padding: var(--sp-2) var(--sp-6); border-radius: var(--radius); background: var(--raised); color: var(--t3); border: 1px solid var(--border); }
+/* :not(.sr-only) so the screen-reader description inside a badge does not
+   itself get painted as a badge — it is clipped, but it should not inherit
+   padding, background and a border it will never show. */
+.pd-svc span:not(.sr-only) { font-size: var(--fs-xs); font-weight: 600; letter-spacing: .05em; font-family: var(--mono); padding: var(--sp-2) var(--sp-6); border-radius: var(--radius); background: var(--raised); color: var(--t3); border: 1px solid var(--border); }
 .pd-svc span.svc-core { background: var(--odim); color: var(--orange); border-color: transparent; }
 .pd-svc span.svc-cap  { background: var(--t2);   color: var(--ink);    border-color: transparent; }
 .pd-svc span.svc-ltd  { background: transparent; color: var(--t3);     border-color: var(--border); }
@@ -911,6 +914,15 @@ a.ext-link:hover { color: var(--orange); }
 .la-toggle:hover { background:var(--muted); color:var(--t1); }
 .la-toggle:active { transform: scale(0.97); }
 
+/* UTXO scan: the figure sits beside its control, never inside it. Writing the
+   result into the button's parent used to delete the button. */
+.ni-utxo-val { font-family: var(--mono); font-size: var(--fs-xs); color: var(--t2); margin-right: var(--sp-6); }
+.ni-utxo-val:empty { display: none; }
+.ni-utxo-figure { white-space: nowrap; }
+.ni-utxo-age { white-space: nowrap; color: var(--t4); margin-left: var(--sp-6); }
+
+
+
 .ph-tsv-btn { background: none; border: none; color: var(--t3); font-size: var(--fs-xs); cursor: pointer; padding: 0 var(--sp-6) 0 0; letter-spacing: .03em; font-family: var(--mono); transition: color var(--t-fast), transform var(--t-fast); }
 .ph-tsv-btn:hover { color: var(--t1); }
 .ph-tsv-btn:active { transform: scale(0.97); }
@@ -960,8 +972,13 @@ a.ext-link:hover { color: var(--orange); }
 
 /* ── Services grid ── */
 .svc-grid { min-height: 0; }
-.svc-tip { cursor: default; transition: opacity var(--t-fast); }
-.svc-with-tips:has(.svc-tip:hover) .svc-tip:not(:hover) { opacity: 0.4; }
+/* Badges are focusable, so they advertise themselves and show a focus ring. */
+.svc-tip { cursor: help; transition: opacity var(--t-fast); }
+.svc-tip:focus-visible { outline: 1px solid var(--orange); outline-offset: 1px; border-radius: var(--radius); }
+/* Keyboard focus gets the same treatment as hover: the badge you are reading
+   stands out and its siblings recede, whichever way you got there. */
+.svc-with-tips:has(.svc-tip:hover) .svc-tip:not(:hover),
+.svc-with-tips:has(.svc-tip:focus-visible) .svc-tip:not(:focus-visible) { opacity: 0.4; }
 .svc-desc { font-size: var(--fs-xs); color: var(--t4); font-family: var(--sans); padding: var(--sp-6) 0 var(--sp-2); min-height: 2.4em; line-height: 1.4; opacity: 0; transition: opacity var(--t-fast); pointer-events: none; }
 .svc-desc.svc-desc-visible { opacity: 1; }
 

@@ -480,26 +480,64 @@ const nodePanel = {
   },
 
   _utxoBtnWired: false,
+  _utxoScannedAt: null,
+  _utxoText: "",
+
+  // Core's gettxoutsetinfo carries an eleven-minute server-side timeout, so the
+  // client waits slightly longer. Without a deadline a request that never
+  // settles would leave the control disabled for the rest of the session.
+  UTXO_TIMEOUT_MS: 12 * 60 * 1000,
 
   async _fetchUtxoSet() {
     const btn = $("ni-utxo-btn");
-    const el = $("ni-utxo");
-    if (!el) return;
-    if (btn) { btn.disabled = true; btn.textContent = "scanning…"; }
+    const val = $("ni-utxo-val");
+    if (!val || !btn) return;
+    btn.disabled = true;
+    btn.textContent = "scanning…";
     try {
       const res = await fetch("/api/rpc", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ method: "gettxoutsetinfo", params: [] }),
+        signal: AbortSignal.timeout(this.UTXO_TIMEOUT_MS),
       });
       const j = await res.json();
       if (j.error) throw new Error(j.error);
       const r = j.result;
-      el.textContent = fb(r.txouts) + " utxos · " + utils.fmtBytes(r.disk_size || r.bogosize || 0);
+      // Written to a sibling, never to the button's parent. The result used to
+      // overwrite #ni-utxo, which contained the button, so a successful scan
+      // deleted the only way to run another one.
+      this._utxoText = fb(r.txouts) + " utxos · " + utils.fmtBytes(r.disk_size || r.bogosize || 0);
+      this._utxoScannedAt = Date.now();
+      this._renderUtxo();
+      btn.textContent = "rescan";
     } catch (e) {
-      if (btn) { btn.disabled = false; btn.textContent = "retry"; }
-      toastStack.add("gettxoutsetinfo: " + e.message);
+      btn.textContent = "retry";
+      const msg = e.name === "TimeoutError" ? "timed out" : e.message;
+      toastStack.add("gettxoutsetinfo: " + msg);
+    } finally {
+      // Always: a control you cannot get back to is the bug being fixed.
+      btn.disabled = false;
     }
+  },
+
+  // The UTXO set changes with every block, so a bare figure silently goes
+  // stale. Showing when it was taken is what makes it trustworthy.
+  _renderUtxo() {
+    const val = $("ni-utxo-val");
+    if (!val || !this._utxoScannedAt) return;
+    // Two spans rather than one string: the panel is narrow, and a single run
+    // of text breaks mid-age ("1s / ago"). Each part stays whole and the line
+    // wraps between them instead.
+    val.textContent = "";
+    const figure = document.createElement("span");
+    figure.className = "ni-utxo-figure";
+    figure.textContent = this._utxoText;
+    const age = document.createElement("span");
+    age.className = "ni-utxo-age";
+    age.textContent = utils.fmtAgeAgo((Date.now() - this._utxoScannedAt) / 1000);
+    val.appendChild(figure);
+    val.appendChild(age);
   },
 
   _renderNetworkReachability(ni) {
@@ -562,7 +600,16 @@ const nodePanel = {
                 ? "svc-cap"
                 : "svc-ltd";
             const desc = SVC_DESC[s] || "";
-            return `<span class="${cls} svc-tip" data-svc-tip="${esc(desc)}">${esc(s)}</span>`;
+            // The description used to be reachable by hover alone, so keyboard
+            // users, touch users and screen readers never saw it. Deliberately
+            // no title: this panel already renders the description into its own
+            // styled line below the badges, and a native tooltip would say the
+            // same thing again in a second, unstyled, delayed channel. Screen
+            // readers get it as real text instead, so the accessible name reads
+            // "WITNESS — serves witness data" with nothing shown on screen.
+            return `<span class="${cls} svc-tip" tabindex="0" data-svc-tip="${esc(desc)}">${esc(s)}${
+              desc ? `<span class="sr-only"> — ${esc(desc)}</span>` : ""
+            }</span>`;
           })
           .join("") +
         "</div>" +

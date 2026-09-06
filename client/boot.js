@@ -64,24 +64,34 @@ charts.init();
 // Bandwidth chart hover
 network._initHover();
 
-// Services badge hover description
-document.addEventListener('mouseover', e => {
-  const badge = e.target.closest('.svc-tip[data-svc-tip]');
+// Services badge description. Driven by focus as well as hover: the badges
+// are the only tooltip-bearing elements in the app that were pointer-only,
+// which left keyboard and touch users with no way to read them at all.
+function _svcShow(target) {
+  const badge = target?.closest?.('.svc-tip[data-svc-tip]');
   const desc = $('svc-desc');
   if (!desc) return;
   if (badge && badge.dataset.svcTip) {
     desc.textContent = badge.dataset.svcTip;
     desc.classList.add('svc-desc-visible');
-  } else if (!e.target.closest('.svc-with-tips')) {
+  } else if (!target?.closest?.('.svc-with-tips')) {
     desc.classList.remove('svc-desc-visible');
   }
-});
-document.addEventListener('mouseout', e => {
-  if (!e.target.closest('.svc-with-tips')) {
-    const desc = $('svc-desc');
-    if (desc) desc.classList.remove('svc-desc-visible');
-  }
-});
+}
+// Hiding is decided by where the pointer or focus is going, not where it
+// came from: the element being left is itself inside the badge group, so
+// testing it would never hide anything.
+function _svcHideIfLeaving(destination) {
+  if (destination?.closest?.('.svc-with-tips')) return;
+  const desc = $('svc-desc');
+  if (desc) desc.classList.remove('svc-desc-visible');
+}
+document.addEventListener('mouseover', e => _svcShow(e.target));
+document.addEventListener('mouseout',  e => _svcHideIfLeaving(e.relatedTarget));
+// focusin/focusout rather than focus/blur: these bubble, so one delegated
+// listener covers badges that are re-rendered on every state update.
+document.addEventListener('focusin',  e => _svcShow(e.target));
+document.addEventListener('focusout', e => _svcHideIfLeaving(e.relatedTarget));
 
 // Global copy-to-clipboard delegation
 document.addEventListener('click', e => {
@@ -152,6 +162,15 @@ document.addEventListener('keydown', e => {
   if (e.key === '?' && !e.ctrlKey && !e.metaKey && !e.altKey && !_typingInField(e.target)) {
     e.preventDefault();
     shortcutsOverlay.open();
+    return;
+  }
+  // Escape backs out of a selected peer. Deliberately last: the sheets above
+  // have already returned, the peer filter and the terminal own Escape while
+  // focused, and this only fires when a peer is actually selected.
+  if (e.key === 'Escape' && !_typingInField(e.target) && !terminalDrawer.isOpen()
+      && peersPanel._selectedId != null) {
+    e.preventDefault();
+    peersPanel.deselect();
   }
 });
 
@@ -203,6 +222,7 @@ $('blk-body')?.addEventListener('keydown', e => {
 });
 
 // Button listeners
+$('pd-back')?.addEventListener('click', () => peersPanel.deselect());
 $('conn-retry')?.addEventListener('click', () => poller.retryNow());
 $('la-reveal-btn')?.addEventListener('click', () => nodePanel.toggleLocalAddrs());
 $('peers-tsv-btn')?.addEventListener('click', () => peersPanel.exportTSV());
@@ -241,6 +261,8 @@ setInterval(() => banList.refresh(), 60000);
 // Staleness indicator — every second
 setInterval(() => {
   mobileBar.tickClock();
+  // Keep the UTXO scan's age honest between scans.
+  nodePanel._renderUtxo();
 
   // Tick tip age elements every second so they stay live between SSE events
   const _tipTime = poller._lastData?.blocks?.[0]?.time;
