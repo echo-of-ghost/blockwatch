@@ -152,6 +152,15 @@ document.addEventListener('keydown', e => {
   if (e.key === '?' && !e.ctrlKey && !e.metaKey && !e.altKey && !_typingInField(e.target)) {
     e.preventDefault();
     shortcutsOverlay.open();
+    return;
+  }
+  // Escape backs out of a selected peer. Deliberately last: the sheets above
+  // have already returned, the peer filter and the terminal own Escape while
+  // focused, and this only fires when a peer is actually selected.
+  if (e.key === 'Escape' && !_typingInField(e.target) && !terminalDrawer.isOpen()
+      && peersPanel._selectedId != null) {
+    e.preventDefault();
+    peersPanel.deselect();
   }
 });
 
@@ -203,6 +212,7 @@ $('blk-body')?.addEventListener('keydown', e => {
 });
 
 // Button listeners
+$('pd-back')?.addEventListener('click', () => peersPanel.deselect());
 $('conn-retry')?.addEventListener('click', () => poller.retryNow());
 $('la-reveal-btn')?.addEventListener('click', () => nodePanel.toggleLocalAddrs());
 $('peers-tsv-btn')?.addEventListener('click', () => peersPanel.exportTSV());

@@ -5,12 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **The peer detail panel was a one-way door.** Selecting a peer replaced the network overview — peer count, the inbound and outbound split, and the transport mix across ipv4, ipv6, onion, i2p and cjdns — and the selection was cleared in only three places: disconnecting the peer, banning it, or the peer dropping on its own. Two of those are destructive, so the overview was effectively unreachable once you clicked anything. There is now a `← overview` control in the panel header, clicking the selected row again toggles it off, and `Esc` backs out. Escape is deliberately last in the handler chain, so the peer filter and the terminal keep it while focused.
+
 ## [2.5.0] - 2026-09-05
 
 ### Added
 - **The hidden features are now findable.** A product review scored discoverability 4/10: the terminal rewritten for 2.4.0 had no button, icon or hint anywhere in the interface and was reachable only by knowing `ctrl+\``, panels could be dragged, resized, hidden and reset with none of it signposted, and clicking a block height to jump to any height looked exactly like a static heading. Two titlebar badges now open the terminal and a shortcuts sheet, and `?` opens that sheet from anywhere outside a text field. The sheet documents 22 interactions across five groups, including the ones that were previously undocumented entirely. It is a labelled modal dialog that traps focus, closes on `Escape` and returns focus to whatever opened it. No new capability was added; this only makes shipped work reachable.
 - **Interactive elements now look interactive.** The jump-to-height control gets a visible affordance matching the existing tooltip-anchor treatment, panel headers hint that they carry a context menu, and icon-only buttons gained `title` so hover works for sighted mouse users, not just screen readers.
-
 - **The block explorer is now a setting, and settings now have a home.** Every block height and hash linked to mempool.space unconditionally, so clicking one told a third party which blocks you were inspecting — from an app whose whole purpose is not having to ask anyone else about your chain. A settings sheet, reached from a new titlebar badge, offers mempool.space (still the default, so nothing changes for anyone who does not care), a custom base URL for an explorer you host yourself, and `none`, which renders heights and hashes as plain text and makes no outbound links at all. A custom URL accepts a `{hash}` placeholder for explorers whose paths are not `/block/<hash>`.
 
 ### Fixed

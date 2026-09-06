@@ -171,6 +171,9 @@ const peersPanel = {
   renderOverview() {
     const body = $("peer-detail-body");
     if (!body) return;
+    // Every path that lands on the overview goes through here, including the
+    // disconnect and ban actions that clear the selection on their own.
+    this._syncBackBtn();
     const peers = this._cache || [];
     setText("pd-ph", peers.length ? peers.length + " peers" : "—");
 
@@ -626,7 +629,30 @@ const peersPanel = {
     });
   },
 
+  // Clearing the selection was previously only reachable by disconnecting or
+  // banning the peer, so the network overview — peer count, inbound/outbound
+  // split, transport mix — became unreachable after the first click unless you
+  // took a destructive action.
+  deselect() {
+    if (this._selectedId == null) return;
+    this._selectedId = null;
+    this._renderedPeerId = null;
+    $("peer-table-body")
+      ?.querySelectorAll("tr")
+      .forEach((r) => r.classList.remove("peer-sel"));
+    this.renderOverview();
+    this._syncBackBtn();
+  },
+
+  _syncBackBtn() {
+    const btn = $("pd-back");
+    if (btn) btn.style.display = this._selectedId == null ? "none" : "";
+  },
+
   selectById(pid) {
+    // Clicking the selected row again returns to the overview. The visible
+    // control carries the affordance; this just makes the obvious gesture work.
+    if (this._selectedId === pid) return this.deselect();
     this._selectedId = pid;
     this._renderedPeerId = null;
     $("peer-table-body")
@@ -644,6 +670,7 @@ const peersPanel = {
       this._renderedPeerId = null;
       this.renderOverview();
     }
+    this._syncBackBtn();
   },
 
   exportTSV() {

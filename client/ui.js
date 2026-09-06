@@ -1390,7 +1390,8 @@ const shortcutsOverlay = {
     ["tables", [
       ["↑ / ↓", "move between rows in the peers and blocks tables"],
       ["Enter / Space", "select the focused row"],
-      ["Esc", "clear the peer filter"],
+      ["click again", "deselect a peer and return to the network overview"],
+      ["Esc", "clear the peer filter, or back out of a selected peer"],
       ["↓ in the filter", "jump into the peer list"],
     ]],
     ["panels", [
