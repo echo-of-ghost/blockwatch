@@ -449,11 +449,19 @@ const charts = {
       const ro = new ResizeObserver(() => {
         if (!hasData()) return;
         if (panel.style.display === "none") return;
+        // The fluid layout engine animates panel widths every frame, and a
+        // canvas re-measure plus redraw per chart per frame is the most
+        // expensive thing in that loop. Defer to the settle event instead.
+        if (document.body.classList.contains("fluid-active")) return;
         if (raf) cancelAnimationFrame(raf);
         raf = requestAnimationFrame(() => {
           raf = null;
           chart._measure();
         });
+      });
+      window.addEventListener("fluid:settled", () => {
+        if (!hasData() || panel.style.display === "none") return;
+        chart._measure();
       });
       ro.observe(panel);
       this._resizeObservers.push(ro);
@@ -470,12 +478,14 @@ const charts = {
     if (sparkPanel) {
       let raf = null;
       const ro = new ResizeObserver(() => {
+        if (document.body.classList.contains("fluid-active")) return;
         if (raf) cancelAnimationFrame(raf);
         raf = requestAnimationFrame(() => {
           raf = null;
           network._drawSpark();
         });
       });
+      window.addEventListener("fluid:settled", () => network._drawSpark());
       ro.observe(sparkPanel);
       this._resizeObservers.push(ro);
     }

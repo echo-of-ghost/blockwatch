@@ -428,6 +428,7 @@ function loadStaticFiles() {
     "panels/mining.js",
     "panels/mempool.js",
     "terminal.js",
+    "fluid.js",
     "boot.js",
   ];
   const files = [
