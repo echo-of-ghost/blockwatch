@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- **A panel being dragged or resized now shows it.** The only visual change on a held panel was `box-shadow: 0 28px 56px rgba(0,0,0,.92)` — a pure black shadow, on a `#080808` canvas holding `#0e0e0e` panels. That is at most eight levels of contrast, falling where the ground already reads black, so the cue was effectively invisible. Every `.ph` already carries a `border-bottom` in orange at 12% opacity and a 2px title marker at 55%, both structural and barely there. On an active panel the rule goes to full strength and the grip icon comes up to match the marker, so the handle you are holding is the thing that lights up. Nothing changes tone: the two orange marks are the whole signal. Nothing new is introduced; two existing elements change register.
+- **Louder treatments were built and rejected.** A solid orange title bar reads as an error state and drowns the panel's own content. A warm `--osoft` wash across the header is unmissable but puts an accent fill where this dashboard never puts one. A neutral surface lift turned out to be invisible on eight of the ten panels, which paint their own `--ink` body over the panel element; only `blocks` and `peers` have transparent bodies, so they were the only two that visibly went pale. A cue that appears on two panels out of ten is worse than none, and it was never what carried the state.
+- **The grip icon lights to full orange rather than the marker's resting 55%.** At `.55` over `--ink` it renders `rgb(138,68,24)` and scores 2.68 against the header, missing the 3:1 that WCAG 1.4.11 asks of a non-text element conveying state. Full orange scores 6.47, and the marker comes up with it so the two stay matched.
+- **Resizing had no visual state at all** beyond the cursor. It now shares the drag treatment exactly; only stacking differs. Two elevation steps were tried first, on the theory that a dragged panel is lifted off the board while a resized one stays on it, but the two states never appear at the same time, so the difference was invisible in use and only surfaced in a side-by-side. A distinction nobody can perceive in context is not hierarchy, it is inconsistency.
+- **The held panel's title and its 2px marker go to full strength**, so the panel you are holding names itself. Three cues, all of them intensifications of elements every header already has, and no new furniture. A solid orange title bar was built and compared against this: nothing else in the dashboard is an orange fill at that scale, so it read as an alert rather than a held object and drowned the panel's own content.
+
+### Fixed
+- **A focus ring outlined the header and outlived the drag.** The header is focused programmatically on grab so `alt`+arrow works after a click, and the browser cannot tell that focus came from a pointer, so it matched `:focus-visible`. It persisted after release, reading as a box around the header that the drag state is not supposed to have. `fluid.js` now marks focus acquired by pointer and clears that mark on the first keypress, so a mouse user never sees a ring and a keyboard user gets one immediately.
+
 ## [3.0.0] - 2026-09-06
 
 ### Changed
