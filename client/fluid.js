@@ -543,7 +543,12 @@ const fluid = {
         (layout._LABEL[name] || name) + ' panel. Alt with arrow keys moves it, alt with shift and up or down resizes it.');
       ph.setAttribute('aria-keyshortcuts',
         'Alt+ArrowUp Alt+ArrowDown Alt+ArrowLeft Alt+ArrowRight');
-      ph.addEventListener('keydown', (e) => this._onKey(e, name));
+      ph.addEventListener('keydown', (e) => {
+        // Any key means the keyboard is driving now: restore the focus ring.
+        delete ph.dataset.pointerFocus;
+        this._onKey(e, name);
+      });
+      ph.addEventListener('blur', () => { delete ph.dataset.pointerFocus; });
       ph.addEventListener('pointerdown', () => layout._bringToFront(panel), true);
     }
 
@@ -564,6 +569,12 @@ const fluid = {
     // preventDefault below suppresses the browser's focus-on-mousedown, which
     // would leave the keyboard controls unreachable for anyone who clicks a
     // panel before pressing alt+arrow. Focus explicitly first.
+    //
+    // Marked as pointer-acquired, because the browser cannot tell that this
+    // focus came from a pointer and will match :focus-visible, painting a ring
+    // around the header that outlives the drag. The mark is cleared the moment
+    // a key is pressed, so a keyboard user gets the ring back immediately.
+    ph.dataset.pointerFocus = '1';
     try { ph.focus({ preventScroll: true }); } catch (_) { ph.focus(); }
     e.preventDefault();
 

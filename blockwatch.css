@@ -2267,15 +2267,72 @@ body.term-resizing { user-select: none; cursor: ns-resize; }
    Promoting all of them permanently would cost memory for no gain. */
 .fluid-active .panel { will-change: transform; }
 
-.fluid-on .panel.fluid-dragging {
-  z-index: 60;
-  cursor: grabbing;
-  /* Lifted, not tilted or scaled: the panel stays exactly the size it will be
-     when released, so the destination is readable rather than theatrical. */
-  box-shadow: var(--shadow-drag);
+/* Elevation is expressed by lightness, not shadow.
+   --shadow-drag is pure black, and this canvas is --void #080808 with panels at
+   --ink #0e0e0e, so a black shadow has at most eight levels of contrast to work
+   with and falls where the ground already reads black. Dark interfaces signal
+   height by moving up the surface ramp instead: --ink 14 -> --surface 21, with
+   the header following so the panel lifts as one object.
+   Deliberately no accent colour: --orange carries meaning in 74 other rules
+   (block fill, fee rates, the live dot), and spending it to say "you are holding
+   this" both dilutes that and states something the pointer already says. */
+.fluid-on .panel {
+  transition: box-shadow var(--t-std), background-color var(--t-std) ease;
 }
-.fluid-on .panel.fluid-dragging .ph { cursor: grabbing; }
-.fluid-on .panel.fluid-resizing { z-index: 55; }
+.fluid-on .panel .ph { transition: background-color var(--t-std) ease; }
+
+/* ACTIVE STATE — dragging and resizing share it exactly.
+
+   Restraint over emphasis. Three louder treatments were built and rejected: a
+   solid orange title bar reads as an error state and drowns the panel's own
+   content; a warm --osoft wash across the header is unmissable but puts an
+   accent fill where this dashboard never puts one; and a neutral surface lift
+   turned out to be invisible on most panels (see below).
+
+   What is left is the smallest change that still reads: the header's rule and
+   its grip icon. Every .ph already carries a border-bottom in orange at 12%
+   opacity and a 2px title marker at 55% — structural, barely there. On an
+   active panel the rule goes to full strength and the grip icon comes up to
+   match the marker, so the handle you are holding is the thing that lights up.
+   Nothing is introduced; two existing elements change register.
+
+   Nothing changes tone. A surface lift to --raised was tried and removed: eight
+   of the ten panels paint their own --ink body over the panel element, so the
+   lift was invisible on them, while `blocks` and `peers` have transparent
+   bodies and were the only two that visibly went pale. A cue that appears on
+   two panels out of ten is worse than no cue, and it was never the thing doing
+   the work — these two orange marks were, on every panel, the whole time.
+
+   Dragging and resizing share one treatment. They briefly had two elevation
+   steps, on the theory that a dragged panel is lifted off the board while a
+   resized one stays on it. The two states never appear at the same time, so the
+   difference was invisible in use and only surfaced in a side-by-side. A
+   distinction nobody can perceive in context is not hierarchy, it is
+   inconsistency. */
+/* The header keeps its resting --ink. Only the rule and the grip change, so the
+   two orange marks are the whole signal and nothing else shifts underneath
+   them. The body lifting to --raised behind a dark header also gives the header
+   a defined edge it does not have at rest. */
+.fluid-on .panel.fluid-dragging > .ph,
+.fluid-on .panel.fluid-resizing > .ph {
+  border-bottom: 1px solid var(--orange);
+}
+/* The grip and the title marker are the same mark, so they light up together
+   and stay matched. Both go to full --orange rather than the marker's resting
+   55%: at .55 over --raised the grip renders rgb(145,74,30), which scores 2.60
+   against the header and misses the 3:1 that WCAG 1.4.11 asks of a non-text
+   element conveying state. Full orange scores 5.72. */
+.fluid-on .panel.fluid-dragging > .ph .ph-drag-icon,
+.fluid-on .panel.fluid-resizing > .ph .ph-drag-icon { color: var(--orange); }
+.fluid-on .panel.fluid-dragging > .ph .ph-title::before,
+.fluid-on .panel.fluid-resizing > .ph .ph-title::before { opacity: 1; }
+
+/* Only the stacking differs: a resized panel does not need to clear its
+   neighbours the way a dragged one does. */
+.fluid-on .panel.fluid-resizing {
+  z-index: 55;
+  box-shadow: var(--shadow-hover);
+}
 
 /* The classic spawn/out animations animate `transform`, and a CSS animation
    outranks an inline style. In this engine position IS the inline transform, so
@@ -2300,6 +2357,14 @@ body.term-resizing { user-select: none; cursor: ns-resize; }
   outline-offset: -1px;
   border-radius: var(--radius);
 }
+/* ...but not for pointer-acquired focus. The header is focused programmatically
+   on grab so alt+arrow works after a click, and the browser matches
+   :focus-visible for that — drawing an orange outline around the header that
+   outlives the drag. That is the "box" the drag state should not have; the drag
+   is the elevation and the single rule under the title, nothing more. fluid.js
+   marks the focus source and clears the mark on the first keypress, so keyboard
+   users keep their ring and mouse users never see one. */
+.fluid-on .ph[data-pointer-focus]:focus-visible { outline: none; }
 
 /* Resize handles. `.panel` is overflow:hidden, so the classic handles at
    bottom:-4px / top:-4px have half their height clipped away and only about
@@ -2314,7 +2379,9 @@ body.term-resizing { user-select: none; cursor: ns-resize; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  /* The engine already snaps rather than eases when this is set; the shadow is
-     the only remaining motion cue, so it goes too. */
+  /* The engine snaps rather than eases when this is set, so the drop shadow's
+     only job here is depth theatre and it goes. The surface lift stays: it is a
+     state cue, not motion, and it is the thing that makes the held panel
+     legible at all on this dark ground. */
   .fluid-on .panel.fluid-dragging { box-shadow: var(--shadow-hover); }
 }
