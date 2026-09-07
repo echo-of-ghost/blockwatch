@@ -14,7 +14,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Resizing had no visual state at all** beyond the cursor. It now shares the drag treatment exactly; only stacking differs. Two elevation steps were tried first, on the theory that a dragged panel is lifted off the board while a resized one stays on it, but the two states never appear at the same time, so the difference was invisible in use and only surfaced in a side-by-side. A distinction nobody can perceive in context is not hierarchy, it is inconsistency.
 - **The held panel's title and its 2px marker go to full strength**, so the panel you are holding names itself. Three cues, all of them intensifications of elements every header already has, and no new furniture. A solid orange title bar was built and compared against this: nothing else in the dashboard is an orange fill at that scale, so it read as an alert rather than a held object and drowned the panel's own content.
 
+### Added
+
 ### Fixed
+- **The testnet, testnet4 and regtest accent colours failed WCAG AA.** The contrast gate parsed only `:root`, so the four `html.chain-*` palettes — which override `--orange`, `--amber` and the translucent washes derived from them — were never checked. The regtest accent `#9a5cc8` scored 4.36, 4.12 and 3.85 on the three surfaces it appears against, and 3.48 on the `--osoft` wash; testnet's `#3a8fd4` scored 4.23 on that wash. Both are lifted to the nearest value that clears 4.5:1 everywhere while keeping their hue and saturation (`#af7ed3` and `#4998d7`). The gate now merges every chain palette over the base and checks all five.
+- **Duplicate `[Unreleased]` sections** in this file, merged into one.
+
 - **A focus ring outlined the header and outlived the drag.** The header is focused programmatically on grab so `alt`+arrow works after a click, and the browser cannot tell that focus came from a pointer, so it matched `:focus-visible`. It persisted after release, reading as a box around the header that the drag state is not supposed to have. `fluid.js` now marks focus acquired by pointer and clears that mark on the first keypress, so a mouse user never sees a ring and a keyboard user gets one immediately.
 
 ## [3.0.0] - 2026-09-06

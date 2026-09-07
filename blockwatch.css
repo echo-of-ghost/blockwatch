@@ -26,7 +26,10 @@
   /* Text ramp. Every value clears WCAG AA (4.5:1) against all four surfaces
      above, --raised #1c1c1c being the worst case: t1 13.91, t2 8.97, t3 6.21,
      t4 4.68. t4 carries nearly every label in the UI, so it sets the floor.
-     Verify with the contrast script before changing any of these. */
+     Verify with `python3 test/contrast.py` before changing any of these. It
+     also checks the per-chain accent overrides below: those are a separate
+     palette per network, and the testnet and regtest accents were failing AA
+     on every surface until the gate learned to parse them. */
   --t1:      #e8e8e8;
   --t2:      #bcbcbc;
   --t3:      #9c9c9c;
@@ -116,10 +119,10 @@
 }
 
 /* ── Chain-specific accent colours ── */
-html.chain-testnet  { --orange:#3a8fd4; --orange2:#2a6aaa; --odim:rgba(58,143,212,.09); --osoft:rgba(58,143,212,.22); --amber:#4a9fd4; --orange-rgb:58,143,212; }
-html.chain-testnet4 { --orange:#3a8fd4; --orange2:#2a6aaa; --odim:rgba(58,143,212,.09); --osoft:rgba(58,143,212,.22); --amber:#4a9fd4; --orange-rgb:58,143,212; }
+html.chain-testnet  { --orange:#4998d7; --orange2:#2e73b9; --odim:rgba(73,152,215,.09); --osoft:rgba(73,152,215,.22); --amber:#4a9fd4; --orange-rgb:73,152,215; }
+html.chain-testnet4 { --orange:#4998d7; --orange2:#2e73b9; --odim:rgba(73,152,215,.09); --osoft:rgba(73,152,215,.22); --amber:#4a9fd4; --orange-rgb:73,152,215; }
 html.chain-signet   { --orange:#c8a820; --orange2:#a88810; --odim:rgba(200,168,32,.09);  --osoft:rgba(200,168,32,.22);  --amber:#c8a820; --orange-rgb:200,168,32; }
-html.chain-regtest  { --orange:#9a5cc8; --orange2:#7a3ca8; --odim:rgba(154,92,200,.09);  --osoft:rgba(154,92,200,.22);  --amber:#9a5cc8; --orange-rgb:154,92,200; }
+html.chain-regtest  { --orange:#af7ed3; --orange2:#9150c1; --odim:rgba(175,126,211,.09); --osoft:rgba(175,126,211,.22); --amber:#af7ed3; --orange-rgb:175,126,211; }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100dvh; overflow: hidden; background: var(--void); color: var(--t2);
