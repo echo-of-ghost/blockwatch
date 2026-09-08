@@ -382,6 +382,8 @@ const layout = {
 
   restore(panel) {
     if (!panel) return;
+    // A hide may still be animating; its callback would re-hide this panel.
+    this._cancelAnimOut(panel);
     this._minimized.delete(panel);
 
     if (this._isMobile) {
@@ -503,12 +505,31 @@ const layout = {
     setTimeout(() => p.classList.remove("p-spawn"), 320);
   },
 
+  // The hide animation's completion callback is what actually minimizes the
+  // panel, so it has to be cancellable. Without this, resetting the layout (or
+  // restoring the panel) during the 180ms animation left the callback to fire
+  // afterwards and hide a panel the user had just brought back.
+  _outTimers: new Map(),
+
   _animOut(p, cb) {
     p.classList.add("p-out");
-    setTimeout(() => {
+    this._cancelAnimOut(p);
+    const t = setTimeout(() => {
+      this._outTimers.delete(p);
       p.classList.remove("p-out");
       cb();
     }, 180);
+    this._outTimers.set(p, t);
+  },
+
+  // Abandons a hide that is still animating: the panel stays visible and the
+  // bookkeeping in the callback never runs.
+  _cancelAnimOut(p) {
+    const t = this._outTimers.get(p);
+    if (t === undefined) return;
+    clearTimeout(t);
+    this._outTimers.delete(p);
+    p.classList.remove("p-out");
   },
 
   _bringToFront(p) {
@@ -585,6 +606,10 @@ const layout = {
 
   // Reset: restore defaults, clear minimized state, and re-render.
   _reset() {
+    // Reset means every panel is shown, including any that is part-way through
+    // its hide animation. Clearing _minimized is not enough on its own: the
+    // pending callback would add it straight back.
+    this._allPanels().forEach((p) => this._cancelAnimOut(p));
     this._cols = this._DEFAULT_COLS.map((col) => col.map((s) => ({ ...s })));
     this._minimized.clear();
     this._save();
