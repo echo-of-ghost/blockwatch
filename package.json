@@ -10,6 +10,8 @@
     "start:signet": "BITCOIN_RPC_PORT=38332 node server.js",
     "start:regtest": "BITCOIN_RPC_PORT=18443 node server.js",
     "app": "electron .",
+    "test": "bash test/run.sh",
+    "test:app": "bash test/run.sh --app",
     "dist": "electron-builder --linux",
     "release": "npm run dist && gpg --detach-sign --armor dist/*.AppImage"
   },
