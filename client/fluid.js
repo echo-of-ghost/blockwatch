@@ -540,9 +540,11 @@ const fluid = {
       // description, and aria-keyshortcuts advertises the controls.
       ph.setAttribute('tabindex', '0');
       ph.setAttribute('aria-label',
-        (layout._LABEL[name] || name) + ' panel. Alt with arrow keys moves it, alt with shift and up or down resizes it.');
+        (layout._LABEL[name] || name) +
+          ' panel. Alt with arrow keys moves it, alt with shift and up or down resizes it,' +
+          ' alt H hides it, alt Home resets the layout.');
       ph.setAttribute('aria-keyshortcuts',
-        'Alt+ArrowUp Alt+ArrowDown Alt+ArrowLeft Alt+ArrowRight');
+        'Alt+ArrowUp Alt+ArrowDown Alt+ArrowLeft Alt+ArrowRight Alt+H Alt+Home');
       ph.addEventListener('keydown', (e) => {
         // Any key means the keyboard is driving now: restore the focus ring.
         delete ph.dataset.pointerFocus;
@@ -817,9 +819,27 @@ const fluid = {
     if (this._drag || this._resize) return;
     if (!e.altKey || e.ctrlKey || e.metaKey) return;
     const k = e.key;
-    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home'].includes(k)) return;
+    const key = k.length === 1 ? k.toLowerCase() : k;
+    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'h'].includes(key)) return;
     e.preventDefault();
     e.stopPropagation();
+
+    // Hiding a panel was reachable only by right-clicking its header, which
+    // made it the one layout action with no keyboard path at all. The restore
+    // bar already brings a panel back, so this completes the round trip.
+    if (key === 'h') {
+      const panel = layout._panel(name);
+      if (!panel) return;
+      const label = layout._LABEL[name] || name;
+      if (layout._minimized.has(panel)) {
+        layout.restore(panel);
+        this._announce(label + ' shown');
+      } else {
+        layout.minimize(panel);
+        this._announce(label + ' hidden. Bring it back from the restore bar.');
+      }
+      return;
+    }
 
     if (k === 'Home') {
       // layout._reset() rather than rebuilding _cols by hand: it also clears

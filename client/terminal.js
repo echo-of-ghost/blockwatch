@@ -278,6 +278,20 @@ const terminalDrawer = (() => {
   }
 
   // ── Execute ───────────────────────────────────────────────────────────────
+  // The terminal issues RPC through the Electron preload bridge, not through
+  // the server's /api/rpc allowlist. In remote mode (BLOCKWATCH_REMOTE=1) the
+  // page is served to a plain browser, the preload never runs, and
+  // window.terminal is undefined — so every command, `help` included, used to
+  // fail with a raw "Cannot read properties of undefined (reading 'exec')".
+  function _bridgeReady() {
+    return !!(window.terminal && typeof window.terminal.exec === 'function');
+  }
+
+  const NO_BRIDGE =
+    'No connection to Bitcoin Core from this page. The terminal sends RPC ' +
+    'through the desktop app; this dashboard is being served to a browser, ' +
+    'which has no such channel. Open Blockwatch in the desktop app to use it.';
+
   async function _exec(raw) {
     const trimmed = raw.trim();
     if (!trimmed) return;
@@ -302,6 +316,11 @@ const terminalDrawer = (() => {
     if (!method) return;
 
     const entry = _appendEntry(trimmed);
+    if (!_bridgeReady()) {
+      _setResult(entry, NO_BRIDGE, 'transport');
+      _setStatus('unavailable', 'err');
+      return;
+    }
     const id = ++_callId;
     _busy = true;
     _activeCall = id;
@@ -372,6 +391,7 @@ const terminalDrawer = (() => {
   async function _fetchMethods() {
     if (_methods.length) return;
     try {
+      if (!_bridgeReady()) throw new Error(NO_BRIDGE);
       const res = await window.terminal.exec(++_callId, 'help', []);
       if (!res || !res.ok || typeof res.result !== 'string') return;
       // Zero-argument methods print with no trailing space (getblockcount,
@@ -574,8 +594,22 @@ const terminalDrawer = (() => {
     requestAnimationFrame(() => el.classList.add('term-visible'));
     setTimeout(() => { const inp = _input(); if (inp) inp.focus(); }, 50);
     _updateNodeBadge();
+    if (!_bridgeReady()) {
+      const inp = _input();
+      if (inp) {
+        inp.disabled = true;
+        inp.placeholder = 'unavailable in the browser';
+      }
+      _setStatus('unavailable', 'err');
+      if (!_noBridgeShown) {
+        _noBridgeShown = true;
+        _setResult(_appendEntry('terminal'), NO_BRIDGE, 'transport');
+      }
+      return;
+    }
     _fetchMethods();
   }
+  let _noBridgeShown = false;
 
   function hide() {
     const el = _el();

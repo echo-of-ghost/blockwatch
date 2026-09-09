@@ -152,17 +152,27 @@ html, body { height: 100dvh; overflow: hidden; background: var(--void); color: v
 
 /* ── Layout ── */
 /* #app and #main fill full viewport — all panels are absolute inside #main */
-#app { position: fixed; inset: 0; background: var(--bg-canvas); }
-/* P0 grid-shift fix: JS adds this class on init, removes it after panels are positioned.
-   Class-based so it survives _clearShellStyles() which does removeAttribute('style').
-   Must use !important to beat any inline style races. */
-#main.main-hidden { visibility: hidden !important; }
-#main {
-  position: absolute; inset: 4px; overflow: hidden;
+/* The window itself. The Electron window is frameless, so this is the outermost
+   surface there is: the gutter grey runs to the pixel boundary with no edge
+   treatment of any kind.
+
+   The canvas and its grain both live here rather than on #main. #main is inset
+   4px, so with the texture on #main the outer 4px was flat --bg-canvas while
+   everything inside it was the same colour plus grain — measurably darker
+   (26,26,26 against 29-32), which read as a faint border around the whole
+   application. Same colour, different texture, still an edge. */
+#app {
+  position: fixed; inset: 0;
   background-color: var(--bg-canvas);
   background-image: var(--tx-grain);
   background-repeat: repeat;
   background-size: 200px 200px;
+}
+
+#main {
+  position: absolute; inset: 4px; overflow: hidden;
+  /* Canvas and grain now live on #app so they reach the window edge. */
+  background: transparent;
 }
 
 /* ── Titlebar ── */
@@ -183,6 +193,9 @@ html, body { height: 100dvh; overflow: hidden; background: var(--void); color: v
 .tb-sync-badge { font-size: var(--fs-xs); font-weight: 600; letter-spacing: .06em; padding: var(--sp-2) var(--sp-6); border-radius: var(--radius); font-family: var(--sans); line-height: 1; }
 .tb-sync-badge.synced  { background: var(--grn-dim); color: var(--grn); }
 .tb-sync-badge.syncing { background: rgba(168,168,168,.1); color: var(--t3); }
+/* Core is not answering. Deliberately the loudest of the three: "Syncing" used
+   to be shown in this situation, which reads as a node that is working. */
+.tb-sync-badge.down    { background: var(--neg-dim); color: var(--neg); }
 .tb-warn       { color: var(--orange); font-size: var(--fs-xs); font-family: var(--sans); line-height: 1; }
 .tb-dim        { color: var(--t3); font-size: var(--fs-xs); font-family: var(--sans); line-height: 1; }
 /* ── Hero strip ── */
@@ -332,6 +345,21 @@ html, body { height: 100dvh; overflow: hidden; background: var(--void); color: v
 /* ── KV rows ── */
 .kv { display: flex; justify-content: space-between; align-items: baseline; padding: var(--sp-4) 0; gap: var(--sp-8); border-bottom: 1px solid rgba(255,255,255,.018); }
 .kv:last-child { border-bottom: none; }
+/* A flex child defaults to min-width:auto, so a long value refuses to shrink
+   and is pushed past the panel's edge instead. .pb is overflow-x:hidden, so it
+   is not scrolled to — it is simply gone: at 1100px the node panel lost 64px of
+   the RPC endpoint off the right-hand side, with nothing to indicate it. The
+   value truncates now, and the elements that can hold a long unbreakable token
+   carry the full text in a title. */
+.kv > .k { min-width: 0; }
+.kv > .v {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.v-pair { min-width: 0; }
+.v-pair > span { overflow: hidden; text-overflow: ellipsis; }
 .kv, .bd-kv, .pd-kv { position: relative; }
 .kv:hover::before,
 .bd-kv:hover::before,
@@ -921,8 +949,14 @@ a.ext-link:hover { color: var(--orange); }
 
 
 
+/* Shared base for a text control in a panel header. .ph-tsv-btn used to be the
+   only one, so the peer-detail back button borrowed it — identical appearance,
+   entirely unrelated action, and a class name that lied about both. */
+.ph-act-btn,
 .ph-tsv-btn { background: none; border: none; color: var(--t3); font-size: var(--fs-xs); cursor: pointer; padding: 0 var(--sp-6) 0 0; letter-spacing: .03em; font-family: var(--mono); transition: color var(--t-fast), transform var(--t-fast); }
+.ph-act-btn:hover,
 .ph-tsv-btn:hover { color: var(--t1); }
+.ph-act-btn:active,
 .ph-tsv-btn:active { transform: scale(0.97); }
 .snapshot-btn { background: var(--odim); border: none; color: var(--orange); font-size: var(--fs-xs); letter-spacing: .06em; font-family: var(--mono); padding: var(--sp-2) var(--sp-8); border-radius: var(--radius); cursor: pointer; transition: background var(--t-std), color .15s, transform var(--t-fast); }
 .snapshot-btn:hover { background: var(--osoft); color: var(--orange); }
@@ -1016,6 +1050,22 @@ a.ext-link:hover { color: var(--orange); }
   -webkit-mask-image: linear-gradient(to right, transparent 0, #000 22px, #000 calc(100% - 22px), transparent 100%);
   mask-image: linear-gradient(to right, transparent 0, #000 22px, #000 calc(100% - 22px), transparent 100%);
 }
+/* Same treatment as .rb-inner above, for any scroller wired through
+   overflowCue. Applied to the scroller itself: the sticky table header is a
+   child of the table, not of this element, so it is unaffected. */
+.scroll-area.x-more {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent 100%);
+  mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent 100%);
+}
+.scroll-area.x-more-start {
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 24px);
+  mask-image: linear-gradient(to right, transparent 0, #000 24px);
+}
+.scroll-area.x-more.x-more-start {
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
+}
+
 .rb-chip {
   display: inline-flex; align-items: center;
   padding: var(--sp-2) var(--sp-6); gap: var(--sp-4);
@@ -1114,7 +1164,9 @@ a.ext-link:hover { color: var(--orange); }
   /* Hide chrome — panels only on small screens */
   #titlebar, #hero, #statusbar { display: none !important; }
 
-  /* #main: normal flow, keep its existing background texture */
+  /* #main: normal flow. The canvas and grain live on #app now, so they cover
+     the viewport here too — previously #main went height:auto on mobile and the
+     texture stopped where its content did. */
   #main, #main.main-mobile {
     position: static !important;
     inset: auto !important;

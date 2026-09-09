@@ -51,9 +51,14 @@ const peersPanel = {
     const tbody = $("peer-table-body");
     if (!tbody) return;
 
-    if (ibd && !peers.length) {
-      tbody.innerHTML =
-        '<tr><td colspan="3" class="ibd-placeholder">peer data unavailable during initial sync</td></tr>';
+    if (!peers.length) {
+      // An empty list is a state worth naming. Outside initial sync this used
+      // to render nothing at all: a grid of column headings over blank space,
+      // which says neither "loading" nor "your node has no peers" — and for a
+      // Bitcoin node, no peers means it is not talking to the network.
+      tbody.innerHTML = ibd
+        ? '<tr><td colspan="3" class="ibd-placeholder">peer data unavailable during initial sync</td></tr>'
+        : '<tr><td colspan="3" class="ibd-placeholder">no peers connected</td></tr>';
       return;
     }
 
@@ -100,7 +105,7 @@ const peersPanel = {
           p.pingtime > 0 ? Math.round(p.pingtime * 1000) + "ms" : "—";
         const pingCell = `<span class="ping-val td-${pc}">${ping}</span>`;
 
-        return `<tr data-pid="${p.id}" role="row" tabindex="0" aria-selected="${isSel}"
+        return `<tr data-pid="${p.id}" role="row" tabindex="-1" aria-selected="${isSel}"
         class="${isSel ? "peer-sel" : ""}">
         <td class="td-peer-main">
           <div class="peer-row-top">
@@ -130,6 +135,7 @@ const peersPanel = {
     if (this._filterTerm) {
       this._applyFilter();
     }
+    rovingRows.sync($("peer-table-body"));
 
     if (this._selectedId != null) {
       const p = this._cache.find((x) => x.id === this._selectedId);
@@ -271,7 +277,7 @@ const peersPanel = {
           <div class="pd-kv"><span class="k">relaying txs</span><span class="v dim">${relaying} / ${peers.length}</span></div>
         </div>
         <div class="pd-section">
-          <div class="pd-hint">select a peer for full detail</div>
+          <div class="pd-hint">select a peer to inspect</div>
         </div>
       </div>`;
 
@@ -394,7 +400,8 @@ const peersPanel = {
       <div class="pd-header">
         <div class="pd-header-top">
           <span class="pd-header-addr">${esc(addrDisplay || "—")}</span>
-          <span class="pd-header-copy copy-icon" data-copy="${esc(p.addr || "")}">⎘</span>
+          <span class="pd-header-copy copy-icon" data-copy="${esc(p.addr || "")}"
+            role="button" tabindex="0" aria-label="Copy peer address">⎘</span>
         </div>
         <div class="pd-header-badges">
           <span class="pd-header-net ${netLabelClass}">${esc(net)}</span>

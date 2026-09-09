@@ -15,8 +15,18 @@ function safeRender(name, fn) {
 
 let _firstRender = true;
 let _staleToastFired = false;
+let _staleToast = null;
 
 function renderAll(d) {
+  // Core unreachable: the payload is zero-filled, not measured. Rendering it
+  // would replace every real value on screen with a convincing-looking zero.
+  // Leave the panels alone and say so instead.
+  if (d && d.error) {
+    nodeState.down(d.error, d.errorDetail);
+    return;
+  }
+  nodeState.up();
+
   poller.setSync(d.blockchain?.initialblockdownload || false);
 
   safeRender('hero',    () => heroStrip.render(d));
@@ -131,6 +141,20 @@ document.addEventListener('keydown', e => {
   utils.copyToClipboard(el.dataset.copy, el);
 });
 
+// `c` on a focused table row copies its hash or address. Clicking the hash cell
+// already did this, but the cell is deliberately not a tab stop — 24 block rows
+// would put 24 stops back into the tab order — so this is how the same action
+// stays available to the keyboard.
+document.addEventListener('keydown', e => {
+  if (e.key !== 'c' || e.ctrlKey || e.metaKey || e.altKey) return;
+  const row = e.target.closest && e.target.closest('tr[data-pid], tr[data-bheight]');
+  if (!row) return;
+  const src = row.querySelector('[data-copy]');
+  if (!src || !src.dataset.copy) return;
+  e.preventDefault();
+  utils.copyToClipboard(src.dataset.copy, src);
+});
+
 // A11y: copy icons
 function a11yCopyIcons(root = document) {
   root.querySelectorAll('.copy-icon:not([role])').forEach(el => {
@@ -151,6 +175,8 @@ terminalDrawer.init();
 contextMenu.initGlobal();
 shortcutsOverlay.init();
 settingsOverlay.init();
+// Horizontal scroll cue on the data tables (see overflowCue).
+document.querySelectorAll('#main .scroll-area').forEach((el) => overflowCue.wire(el));
 // Primary: globalShortcut in main relays via IPC → preload → document CustomEvent
 document.addEventListener('terminal:toggle', () => terminalDrawer.toggle());
 // Fallback: direct keydown
@@ -214,7 +240,7 @@ $('peer-table-body')?.addEventListener('keydown', e => {
     const rows = [...$$('#peer-table-body tr[data-pid]')];
     const idx = rows.indexOf(row);
     const next = e.key === 'ArrowDown' ? rows[idx + 1] : rows[idx - 1];
-    if (next) { next.focus(); peersPanel.selectById(parseInt(next.dataset.pid, 10)); }
+    if (next) { rovingRows.moveTo(next); next.focus(); peersPanel.selectById(parseInt(next.dataset.pid, 10)); }
   }
 });
 
@@ -238,7 +264,7 @@ $('blk-body')?.addEventListener('keydown', e => {
     const rows = [...$$('#blk-body tr[data-bheight]')];
     const idx = rows.indexOf(row);
     const next = e.key === 'ArrowDown' ? rows[idx + 1] : rows[idx - 1];
-    if (next) { next.focus(); blocksPanel.selectByHeight(parseInt(next.dataset.bheight, 10)); }
+    if (next) { rovingRows.moveTo(next); next.focus(); blocksPanel.selectByHeight(parseInt(next.dataset.bheight, 10)); }
   }
 });
 
@@ -285,11 +311,16 @@ setInterval(() => {
   // Keep the UTXO scan's age honest between scans.
   nodePanel._renderUtxo();
 
-  // Tick tip age elements every second so they stay live between SSE events
+  // Tick every display of "time since the last block" from one source, once a
+  // second. The hero was ticked here while the node panel's copy was only
+  // rewritten when a poll arrived, so the two sat side by side disagreeing by
+  // up to a poll interval — 5m 7s in one panel and 5m 5s in the other, for the
+  // same quantity, at the same instant.
   const _tipTime = poller._lastData?.blocks?.[0]?.time;
   if (_tipTime) {
     const _tipAge = utils.fmtAgeAgo(Date.now() / 1000 - _tipTime);
     setText('ch-tip-age', _tipAge);
+    setText('ni-ta', _tipAge);
     const _heroAge = $('hero-tip-age');
     if (_heroAge) _heroAge.textContent = _tipAge;
   }
@@ -303,11 +334,26 @@ setInterval(() => {
   const age = Math.floor((Date.now() - lastAt) / 1000);
   const dot = $('live-dot');
 
+  // Data is still arriving while Core is unreachable — it just says so. Age
+  // alone would therefore report a healthy green dot next to an "Unreachable"
+  // badge, so the explicit state wins.
+  if (nodeState.isDown()) {
+    stale.textContent = 'no node';
+    stale.className = 'sb-stale warn';
+    if (dot) dot.className = 'dot err';
+    mobileBar.updateStale(age);
+    return;
+  }
+
   if (age < 30) {
     stale.textContent = '';
     stale.className = 'sb-stale';
     if (dot) dot.className = 'dot ok';
-    _staleToastFired = false;
+    if (_staleToastFired) {
+      _staleToastFired = false;
+      if (_staleToast) { toastStack._dismiss(_staleToast); _staleToast = null; }
+      toastStack.add('Live updates resumed', 'info');
+    }
   } else if (age < 60) {
     stale.textContent = age + 's ago';
     stale.className = 'sb-stale';
@@ -316,9 +362,19 @@ setInterval(() => {
     stale.textContent = Math.floor(age / 60) + 'm ago';
     stale.className = 'sb-stale warn';
     if (dot) dot.className = 'dot err';
-    if (!_staleToastFired) {
+    // What is actually known here is that no update has arrived for a minute,
+    // which could be the node, this server, or the stream between them. The
+    // old copy said "bitcoind unreachable" and blamed the node for all three.
+    // When Core really is refusing, nodeState has already said so precisely,
+    // so this stays quiet rather than saying it worse a second time.
+    if (!_staleToastFired && !nodeState.isDown()) {
       _staleToastFired = true;
-      toastStack.add('bitcoind unreachable', 'warn');
+      _staleToast = toastStack.add(
+        'Live updates have stopped. The last one arrived ' +
+          Math.floor(age / 60) + 'm ago.',
+        'warn',
+        { sticky: true },
+      );
     }
   }
 

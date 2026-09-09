@@ -164,6 +164,13 @@ const nodePanel = {
       ni.relayfee != null ? f(ni.relayfee * 1e5, 2) + " sat/vB" : "—",
     );
     setText("ni-rpc", rpcNode || "—");
+    // The endpoint truncates on a narrow panel, so keep the whole thing
+    // reachable rather than only the part that happened to fit.
+    const rpcEl = $("ni-rpc");
+    if (rpcEl) {
+      if (rpcNode) rpcEl.title = rpcNode;
+      else rpcEl.removeAttribute("title");
+    }
 
     setDisplay("sync-section", bc.initialblockdownload);
   },
@@ -255,7 +262,8 @@ const nodePanel = {
             ? `<span class="tip-hash-pfx">${hash.slice(0, 4)}${hash.slice(4, 8)}…</span><em>${hash.slice(-4)}</em>`
             : "—";
           const copySpan = hash
-            ? `<span data-copy="${esc(hash)}" class="copy-icon">⎘</span>`
+            ? `<span data-copy="${esc(hash)}" class="copy-icon"
+                 role="button" tabindex="0" aria-label="Copy block hash">⎘</span>`
             : "";
           const branchStr =
             t.branchlen > 0
