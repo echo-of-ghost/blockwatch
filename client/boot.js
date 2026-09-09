@@ -174,6 +174,8 @@ terminalDrawer.init();
 contextMenu.initGlobal();
 shortcutsOverlay.init();
 settingsOverlay.init();
+// Horizontal scroll cue on the data tables (see overflowCue).
+document.querySelectorAll('#main .scroll-area').forEach((el) => overflowCue.wire(el));
 // Primary: globalShortcut in main relays via IPC → preload → document CustomEvent
 document.addEventListener('terminal:toggle', () => terminalDrawer.toggle());
 // Fallback: direct keydown

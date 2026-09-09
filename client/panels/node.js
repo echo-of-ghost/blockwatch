@@ -164,6 +164,13 @@ const nodePanel = {
       ni.relayfee != null ? f(ni.relayfee * 1e5, 2) + " sat/vB" : "—",
     );
     setText("ni-rpc", rpcNode || "—");
+    // The endpoint truncates on a narrow panel, so keep the whole thing
+    // reachable rather than only the part that happened to fit.
+    const rpcEl = $("ni-rpc");
+    if (rpcEl) {
+      if (rpcNode) rpcEl.title = rpcNode;
+      else rpcEl.removeAttribute("title");
+    }
 
     setDisplay("sync-section", bc.initialblockdownload);
   },

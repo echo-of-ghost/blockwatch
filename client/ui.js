@@ -622,6 +622,37 @@ const layout = {
 // TOAST STACK — persistent dismissible error notifications
 // ═══════════════════════════════════════════════════════════════════════════════
 // ═══════════════════════════════════════════════════════════════════════════════
+// OVERFLOW CUE — say when a scroller has more to the side
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+// The peers and blocks tables scroll horizontally once the panel is narrow
+// enough. At 1100px that hides "connected" and "ping" entirely — 102px of the
+// peers table — with nothing to indicate the content is there. The restore bar
+// already solved this for its chips; this is the same treatment, generalised so
+// any scroller can use it.
+const overflowCue = {
+  wire(el) {
+    if (!el || el._cueWired) return;
+    el._cueWired = true;
+    const sync = () => {
+      const more = el.scrollWidth - el.clientWidth - el.scrollLeft > 2;
+      el.classList.toggle("x-more", more);
+      el.classList.toggle("x-more-start", el.scrollLeft > 2);
+    };
+    el.addEventListener("scroll", sync, { passive: true });
+    // Rows are rebuilt on every poll, and column widths move with them.
+    new MutationObserver(sync).observe(el, { childList: true, subtree: true });
+    // A ResizeObserver, not window.resize: the panel is resized by the layout
+    // engine on its own debounce, so a window listener measures the box before
+    // it has changed and lands exactly one viewport behind — the cue appeared
+    // at 1920px, where nothing overflows, and not at 1100px, where it does.
+    if (typeof ResizeObserver === "function") new ResizeObserver(sync).observe(el);
+    else window.addEventListener("resize", sync);
+    sync();
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // ROVING TABINDEX — a data table is one tab stop, not one per row
 // ═══════════════════════════════════════════════════════════════════════════════
 //

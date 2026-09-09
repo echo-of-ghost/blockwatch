@@ -345,6 +345,21 @@ html, body { height: 100dvh; overflow: hidden; background: var(--void); color: v
 /* ── KV rows ── */
 .kv { display: flex; justify-content: space-between; align-items: baseline; padding: var(--sp-4) 0; gap: var(--sp-8); border-bottom: 1px solid rgba(255,255,255,.018); }
 .kv:last-child { border-bottom: none; }
+/* A flex child defaults to min-width:auto, so a long value refuses to shrink
+   and is pushed past the panel's edge instead. .pb is overflow-x:hidden, so it
+   is not scrolled to — it is simply gone: at 1100px the node panel lost 64px of
+   the RPC endpoint off the right-hand side, with nothing to indicate it. The
+   value truncates now, and the elements that can hold a long unbreakable token
+   carry the full text in a title. */
+.kv > .k { min-width: 0; }
+.kv > .v {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.v-pair { min-width: 0; }
+.v-pair > span { overflow: hidden; text-overflow: ellipsis; }
 .kv, .bd-kv, .pd-kv { position: relative; }
 .kv:hover::before,
 .bd-kv:hover::before,
@@ -1035,6 +1050,22 @@ a.ext-link:hover { color: var(--orange); }
   -webkit-mask-image: linear-gradient(to right, transparent 0, #000 22px, #000 calc(100% - 22px), transparent 100%);
   mask-image: linear-gradient(to right, transparent 0, #000 22px, #000 calc(100% - 22px), transparent 100%);
 }
+/* Same treatment as .rb-inner above, for any scroller wired through
+   overflowCue. Applied to the scroller itself: the sticky table header is a
+   child of the table, not of this element, so it is unaffected. */
+.scroll-area.x-more {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent 100%);
+  mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent 100%);
+}
+.scroll-area.x-more-start {
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 24px);
+  mask-image: linear-gradient(to right, transparent 0, #000 24px);
+}
+.scroll-area.x-more.x-more-start {
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
+}
+
 .rb-chip {
   display: inline-flex; align-items: center;
   padding: var(--sp-2) var(--sp-6); gap: var(--sp-4);
