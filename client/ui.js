@@ -621,6 +621,118 @@ const layout = {
 // ═══════════════════════════════════════════════════════════════════════════════
 // TOAST STACK — persistent dismissible error notifications
 // ═══════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
+// ROVING TABINDEX — a data table is one tab stop, not one per row
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+// Both tables already navigate with the arrow keys (see the handlers in
+// boot.js), but every row also carried tabindex="0". That put 52 rows into the
+// tab order out of 125 stops in the whole application: reaching the peer filter
+// from the titlebar took roughly eighty presses, and Tab could not be used to
+// move between panels at all.
+//
+// This is the other half of the standard grid pattern. Exactly one row in each
+// table is tabbable, Tab moves past the table in a single press, and the arrow
+// keys move within it.
+const rovingRows = {
+  // Re-applied after every render, because both tables rebuild their tbody
+  // from innerHTML on each poll.
+  sync(tbody) {
+    if (!tbody) return;
+    const rows = tbody.querySelectorAll("tr[data-pid], tr[data-bheight]");
+    if (!rows.length) return;
+    // Follow the selection, so re-entering the table lands where the user was.
+    const active = tbody.querySelector("tr.peer-sel") || rows[0];
+    for (const r of rows) r.tabIndex = r === active ? 0 : -1;
+  },
+
+  // Called as the arrow keys move focus, so the tab stop travels with it.
+  moveTo(row) {
+    const tbody = row && row.parentElement;
+    if (!tbody) return;
+    for (const r of tbody.children) if (r.tagName === "TR") r.tabIndex = -1;
+    row.tabIndex = 0;
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NODE STATE — is Bitcoin Core actually answering?
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+// /api/data answers 200 with an `error` field and zero-filled structures when
+// the server cannot reach bitcoind. Rendering those zeros is worse than
+// rendering nothing: the dashboard reported block height 0, 0 peers,
+// "0.00% SYNCED" and a retarget estimate extrapolated from no data, all under a
+// titlebar badge reading "Syncing". Every number on screen was false, and
+// nothing said so.
+//
+// The rule is: unknown is shown as unknown. renderAll skips the panels entirely
+// while Core is unreachable, so the last values that were actually true stay on
+// screen (or the "—" placeholders do, on a cold start), and this module says
+// plainly that they are no longer live.
+const nodeState = {
+  _down: false,
+  _reason: null,
+  _toast: null,
+
+  isDown() {
+    return this._down;
+  },
+
+  down(reason, detail) {
+    this._reason = detail || reason || "Bitcoin Core is not responding";
+    if (this._down) return;
+    this._down = true;
+    document.body.classList.add("node-down");
+    for (const id of ["tb-sync", "mb-sync"]) {
+      const el = $(id);
+      if (!el) continue;
+      el.textContent = "Unreachable";
+      el.className = "tb-sync-badge down";
+      // Progressive disclosure: the badge stays short, the raw RPC error is a
+      // hover away for anyone who wants it.
+      el.title = this._reason;
+      el.style.display = "";
+    }
+    setClass("live-dot", "dot err");
+    setClass("mb-dot", "dot err");
+    this._toast = toastStack.add(
+      "Cannot reach Bitcoin Core — " + this._explain(),
+      "error",
+      { sticky: true },
+    );
+  },
+
+  up() {
+    if (!this._down) return;
+    this._down = false;
+    this._reason = null;
+    document.body.classList.remove("node-down");
+    for (const id of ["tb-sync", "mb-sync"]) {
+      const el = $(id);
+      if (el) el.removeAttribute("title");
+    }
+    // The condition is over, so its notice goes with it.
+    if (this._toast) {
+      toastStack._dismiss(this._toast);
+      this._toast = null;
+    }
+    toastStack.add("Reconnected to Bitcoin Core", "info");
+  },
+
+  // Turn the transport failure into something a person can act on. The full
+  // message is still on the badge's title.
+  _explain() {
+    const r = String(this._reason || "");
+    if (/ECONNREFUSED/i.test(r)) return "connection refused. Is bitcoind running?";
+    if (/EHOSTUNREACH|ENETUNREACH|ENOTFOUND/i.test(r)) return "host unreachable";
+    if (/timeout|ETIMEDOUT/i.test(r)) return "the node stopped responding";
+    if (/401|Unauthorized|credentials|cookie/i.test(r)) return "authentication was rejected";
+    if (/in warmup|Loading block index|Verifying blocks/i.test(r)) return "it is still starting up";
+    return "RPC is unavailable";
+  },
+};
+
 const toastStack = {
   _el: null,
   _toasts: [],
@@ -631,7 +743,10 @@ const toastStack = {
     return this._el;
   },
 
-  add(msg, level = "error") {
+  // `sticky` is for conditions rather than events. A node that has gone away is
+  // not a momentary occurrence, and a five-second toast means anyone who looks
+  // ten seconds later gets a red badge with no explanation of what happened.
+  add(msg, level = "error", { sticky = false } = {}) {
     const el = this._container();
     if (!el) return;
     if (
@@ -652,8 +767,11 @@ const toastStack = {
     const entry = { node, msg };
     this._toasts.push(entry);
 
-    // auto-dismiss after 5 s
-    entry._timer = setTimeout(() => this._dismissFade(node), 5000);
+    // auto-dismiss after 5 s — unless the toast describes a state that is still
+    // true, in which case it stays until the state resolves or it is dismissed.
+    if (!sticky) entry._timer = setTimeout(() => this._dismissFade(node), 5000);
+    entry.sticky = sticky;
+    return node;
   },
 
   _dismissFade(node) {
@@ -681,6 +799,7 @@ const toastStack = {
 const contextMenu = {
   _el: null,
   _panel: null,
+  _trigger: null,
 
   _getEl() {
     if (!this._el) {
@@ -711,21 +830,70 @@ const contextMenu = {
     this._panel = panel;
     const isMin = layout._minimized.has(panel);
     el.innerHTML = `
-      <div class="ctx-item" data-action="toggle"><span class="ctx-icon">${isMin ? "&#9672;" : "&#9634;"}</span>${isMin ? "show panel" : "hide panel"}</div>
-      <div class="ctx-sep"></div><div class="ctx-item" data-action="terminal"><span class="ctx-icon">›</span>open terminal</div>
-      <div class="ctx-sep"></div>
-      <div class="ctx-item danger" data-action="reset"><span class="ctx-icon">&#8635;</span>reset layout</div>`;
+      <div class="ctx-item" role="menuitem" tabindex="-1" data-action="toggle"><span class="ctx-icon">${isMin ? "&#9672;" : "&#9634;"}</span>${isMin ? "show panel" : "hide panel"}</div>
+      <div class="ctx-sep" role="separator"></div><div class="ctx-item" role="menuitem" tabindex="-1" data-action="terminal"><span class="ctx-icon">›</span>open terminal</div>
+      <div class="ctx-sep" role="separator"></div>
+      <div class="ctx-item danger" role="menuitem" tabindex="-1" data-action="reset"><span class="ctx-icon">&#8635;</span>reset layout</div>`;
 
     el.style.display = "block";
     const mw = el.offsetWidth,
       mh = el.offsetHeight;
     el.style.left = Math.min(x, window.innerWidth - mw - 6) + "px";
     el.style.top = Math.min(y, window.innerHeight - mh - 6) + "px";
+    this._arm(el, panel);
+  },
+
+  // Shared by both entry points: label the menu, remember where focus came
+  // from, and put focus on the first item so the keyboard can take over.
+  _arm(el, panel) {
+    el.setAttribute("role", "menu");
+    el.setAttribute("aria-label", panel ? "Panel actions" : "Actions");
+    this._trigger = document.activeElement;
+    const first = el.querySelector('[role="menuitem"]');
+    if (first) {
+      try { first.focus({ preventScroll: true }); } catch (_) { first.focus(); }
+    }
+  },
+
+  // Arrow keys move, Enter/Space activate, Escape closes. Without this the menu
+  // had no role, no focusable items and no key handling at all — it could only
+  // ever be operated with a mouse.
+  _onKey(e) {
+    const el = this._el;
+    if (!el || el.style.display === "none") return;
+    const items = [...el.querySelectorAll('[role="menuitem"]')];
+    if (!items.length) return;
+    const i = items.indexOf(document.activeElement);
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      const next = e.key === "ArrowDown"
+        ? items[(i + 1 + items.length) % items.length]
+        : items[(i - 1 + items.length) % items.length];
+      next.focus();
+    } else if (e.key === "Home" || e.key === "End") {
+      e.preventDefault();
+      (e.key === "Home" ? items[0] : items[items.length - 1]).focus();
+    } else if (e.key === "Enter" || e.key === " ") {
+      if (i < 0) return;
+      e.preventDefault();
+      items[i].click();
+    } else if (e.key === "Tab") {
+      // A menu is not part of the page's tab sequence.
+      e.preventDefault();
+      this.hide();
+    }
   },
 
   hide() {
     const el = this._getEl();
     if (el) el.style.display = "none";
+    // Give focus back to whatever opened the menu, rather than leaving it on a
+    // hidden element.
+    const t = this._trigger;
+    this._trigger = null;
+    if (t && document.contains(t)) {
+      try { t.focus({ preventScroll: true }); } catch (_) { t.focus(); }
+    }
   },
 
   initGlobal() {
@@ -735,11 +903,16 @@ const contextMenu = {
       const el = this._getEl();
       if (!el) return;
       this._panel = null;
-      el.innerHTML = `<div class="ctx-item" data-action="terminal"><span class="ctx-icon">›</span>open terminal</div>`;
+      el.innerHTML = `<div class="ctx-item" role="menuitem" tabindex="-1" data-action="terminal"><span class="ctx-icon">›</span>open terminal</div>`;
       el.style.display = "block";
       el.style.left = Math.min(e.clientX + 2, window.innerWidth - el.offsetWidth - 6) + "px";
       el.style.top = Math.min(e.clientY + 2, window.innerHeight - el.offsetHeight - 6) + "px";
+      this._arm(el, null);
     });
+
+    // Capture, so the menu's own keys win over the panel-level handlers behind
+    // it while it is open.
+    document.addEventListener("keydown", (e) => this._onKey(e), true);
   },
 };
 
@@ -827,6 +1000,38 @@ const mobileBar = {
 // explorer target is the first setting with no natural control to hang off, so
 // it gets a sheet, and that sheet is where later settings go.
 // ═══════════════════════════════════════════════════════════════════════════════
+// The elements Tab will actually visit inside `root`, in order.
+//
+// Two corrections over a naive querySelectorAll, both of which broke the
+// settings dialog's focus trap:
+//
+//   - A radio group is ONE tab stop, not one per radio: the browser tabs to the
+//     checked radio (or the first, if none is checked) and uses the arrow keys
+//     to move within the group. Listing all three made the trap compute a `last`
+//     element that Tab never reached, so the boundary never fired and focus
+//     escaped the "modal" dialog into the dashboard behind it.
+//   - offsetParent is an unreliable visibility test inside position:fixed
+//     containers; getClientRects() is not.
+function focusablesIn(root) {
+  if (!root) return [];
+  const sel =
+    'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])';
+  const seenRadioGroup = new Set();
+  return [...root.querySelectorAll(sel)].filter((n) => {
+    if (n.disabled || n.getAttribute("aria-hidden") === "true") return false;
+    if (!n.getClientRects().length) return false;
+    if (n.tagName === "INPUT" && n.type === "radio" && n.name) {
+      if (seenRadioGroup.has(n.name)) return false;
+      const group = [...root.querySelectorAll(
+        'input[type="radio"][name="' + CSS.escape(n.name) + '"]')];
+      const target = group.find((r) => r.checked) || group[0];
+      if (n !== target) return false;
+      seenRadioGroup.add(n.name);
+    }
+    return true;
+  });
+}
+
 const settingsOverlay = {
   _lastFocus: null,
 
@@ -864,8 +1069,7 @@ const settingsOverlay = {
   _trapFocus(e) {
     const el = $("settings");
     if (!el || !this.isOpen() || e.key !== "Tab") return;
-    const f = [...el.querySelectorAll('button, input, [href], [tabindex]:not([tabindex="-1"])')]
-      .filter((n) => !n.disabled && n.offsetParent !== null);
+    const f = focusablesIn(el);
     if (!f.length) return;
     const first = f[0], last = f[f.length - 1];
     if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
@@ -958,13 +1162,15 @@ const shortcutsOverlay = {
     ["tables", [
       ["↑ / ↓", "move between rows in the peers and blocks tables"],
       ["Enter / Space", "select the focused row"],
-      ["click again", "deselect a peer and return to the network overview"],
+      ["c", "copy the focused row's hash or address"],
+      ["select it again", "deselect a peer and return to the network overview"],
       ["Esc", "clear the peer filter, or back out of a selected peer"],
       ["↓ in the filter", "jump into the peer list"],
     ]],
     ["panels", [
       ["drag a header", "reorder panels, within or across columns"],
       ["drag an edge", "resize a panel"],
+      ["Alt + H", "hide the focused panel; bring it back from the restore bar"],
       ["right-click a header", "hide the panel, open the terminal, reset the layout"],
       ["", "layout, column widths and hidden panels persist across sessions"],
     ]],
@@ -977,9 +1183,9 @@ const shortcutsOverlay = {
       ["drag the top edge", "resize the drawer; the height is remembered"],
     ]],
     ["easily missed", [
-      ["click a block height", "jump to any block by height"],
+      ["select a block height", "jump to any block by height"],
       ["hover a label", "most labels carry an explanation"],
-      ["click a row", "open peer or block detail"],
+      ["select a row", "open peer or block detail"],
       ["snapshot ↓", "download the current state as JSON"],
       ["blocks ↓ / peers ↓", "export the table as TSV"],
       ["⚙ in the titlebar", "choose your block explorer, or turn outbound links off"],
@@ -1049,7 +1255,7 @@ const shortcutsOverlay = {
   _trapFocus(e) {
     const el = $("shortcuts");
     if (!el || !this.isOpen() || e.key !== "Tab") return;
-    const focusable = el.querySelectorAll('button, [href], [tabindex]:not([tabindex="-1"])');
+    const focusable = focusablesIn(el);
     if (!focusable.length) return;
     const first = focusable[0];
     const last = focusable[focusable.length - 1];
@@ -1114,6 +1320,28 @@ const heroStrip = {
       ageEl.textContent = tipTime ? utils.fmtAgeAgo(now - tipTime) : "—";
 
     this._setVal("hero-fee", fees.fast != null ? String(fees.fast) : "—");
+    // A dash with no explanation reads as broken. Bitcoin Core will not
+    // estimate fees during initial block download — it has not seen enough
+    // recent blocks to have anything to estimate from — so say that rather than
+    // leaving the operator to guess whether the dashboard has failed.
+    const feeSub = $("hero-fee-sub");
+    const feeCell = $("hero-fee");
+    if (feeSub) {
+      if (fees.fast != null) {
+        feeSub.textContent = "sat / vB";
+        if (feeCell) feeCell.removeAttribute("title");
+      } else if (bc.initialblockdownload) {
+        feeSub.textContent = "while syncing";
+        if (feeCell)
+          feeCell.title =
+            "Bitcoin Core does not estimate fees during initial block download.";
+      } else {
+        feeSub.textContent = "no estimate";
+        if (feeCell)
+          feeCell.title =
+            "Bitcoin Core has not returned a fee estimate yet. It needs recent blocks to estimate from.";
+      }
+    }
 
     this._setVal("hero-mempool", fb(mi.size || 0));
     const mpSub = $("hero-mempool-sub");

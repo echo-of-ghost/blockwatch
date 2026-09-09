@@ -47,14 +47,14 @@ const blocksPanel = {
                 ? "var(--amber)"
                 : "var(--t4)";
 
-        return `<tr class="${isNew ? "new" : ""} ${isSel ? "peer-sel" : ""}" role="row" tabindex="0" aria-selected="${isSel}" data-bheight="${b.height}">
+        return `<tr class="${isNew ? "new" : ""} ${isSel ? "peer-sel" : ""}" role="row" tabindex="-1" aria-selected="${isSel}" data-bheight="${b.height}">
         <td class="td-num">${(() => {
           const href = utils.explorer.blockUrl(b.hash, nodePanel.currentChain);
           return href
             ? `<a class="ext-link" href="${esc(href)}" target="_blank" rel="noopener noreferrer">${fb(b.height)}</a>`
             : fb(b.height);
         })()}</td>
-        <td class="td-hash td-hash-click" data-copy="${esc(b.hash || "")}"><span class="td-hash-prefix">${(b.hash || "").slice(0, 4)}${(b.hash || "").slice(4, 8)}…</span><em>${(b.hash || "").slice(-4)}</em></td>
+        <td class="td-hash td-hash-click" data-copy="${esc(b.hash || "")}" title="Copy block hash"><span class="td-hash-prefix">${(b.hash || "").slice(0, 4)}${(b.hash || "").slice(4, 8)}…</span><em>${(b.hash || "").slice(-4)}</em></td>
         <td class="td-dim">${fb(b.txs)}</td>
         <td class="td-fill">
           <div class="blk-fill-wrap">
@@ -72,6 +72,8 @@ const blocksPanel = {
       const arr = [...this._seenHeights];
       this._seenHeights = new Set(arr.slice(-200));
     }
+
+    rovingRows.sync($("blk-body"));
 
     if (!this._initialised && blocks.length) {
       // First load only: auto-select the tip and render the detail panel.
@@ -229,7 +231,8 @@ const blocksPanel = {
               ? `<a class="ext-link" href="${esc(href)}" target="_blank" rel="noopener noreferrer">${hashDisplay}</a>`
               : `<span class="bd-hash-plain">${hashDisplay}</span>`;
           })()}<span
-             data-copy="${esc(hashFull)}" class="copy-icon">⎘</span>
+             data-copy="${esc(hashFull)}" class="copy-icon"
+             role="button" tabindex="0" aria-label="Copy block hash">⎘</span>
         </span>
       </div>
 
@@ -341,7 +344,10 @@ const blocksPanel = {
 
     el.setAttribute("role", "button");
     el.setAttribute("tabindex", "0");
-    el.setAttribute("aria-label", "Click to jump to a block height");
+    // Names the action, not the input device: this element has role="button",
+    // tabindex and a keydown handler, so "click to" was telling every keyboard
+    // and screen-reader user to do something they cannot.
+    el.setAttribute("aria-label", "Jump to a block height");
 
     const activate = () => {
       if (this._searchActive) return;

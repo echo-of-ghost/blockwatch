@@ -122,7 +122,7 @@
             </div>
             <div class="hero-foot">
               <span class="hero-lbl">next block fee</span
-              ><span class="hero-sub">sat / vB</span>
+              ><span class="hero-sub" id="hero-fee-sub">sat / vB</span>
             </div>
           </div>
           <div class="hero-cell">
@@ -484,6 +484,7 @@
               ><span class="v mono v-copyable"
                 ><span id="mn-cw">—</span
                 ><span id="mn-cw-copy" data-copy="" class="copy-icon"
+                  role="button" tabindex="0" aria-label="Copy chainwork"
                   >⎘</span
                 ></span
               >
@@ -643,10 +644,10 @@
               ><button
                 type="button"
                 id="pd-back"
-                class="ph-tsv-btn"
+                class="ph-act-btn"
                 style="display: none"
                 aria-label="Back to the network overview"
-                title="Back to the network overview  (Esc)"
+                title="Back to the network overview (Esc)"
               >
                 ← overview
               </button></span
@@ -658,7 +659,7 @@
             role="region"
             aria-label="Peer detail"
           >
-            <div class="pd-empty">click a peer to inspect</div>
+            <div class="pd-empty">select a peer to inspect</div>
           </div>
         </div>
 

@@ -17,6 +17,15 @@ let _firstRender = true;
 let _staleToastFired = false;
 
 function renderAll(d) {
+  // Core unreachable: the payload is zero-filled, not measured. Rendering it
+  // would replace every real value on screen with a convincing-looking zero.
+  // Leave the panels alone and say so instead.
+  if (d && d.error) {
+    nodeState.down(d.error, d.errorDetail);
+    return;
+  }
+  nodeState.up();
+
   poller.setSync(d.blockchain?.initialblockdownload || false);
 
   safeRender('hero',    () => heroStrip.render(d));
@@ -131,6 +140,20 @@ document.addEventListener('keydown', e => {
   utils.copyToClipboard(el.dataset.copy, el);
 });
 
+// `c` on a focused table row copies its hash or address. Clicking the hash cell
+// already did this, but the cell is deliberately not a tab stop — 24 block rows
+// would put 24 stops back into the tab order — so this is how the same action
+// stays available to the keyboard.
+document.addEventListener('keydown', e => {
+  if (e.key !== 'c' || e.ctrlKey || e.metaKey || e.altKey) return;
+  const row = e.target.closest && e.target.closest('tr[data-pid], tr[data-bheight]');
+  if (!row) return;
+  const src = row.querySelector('[data-copy]');
+  if (!src || !src.dataset.copy) return;
+  e.preventDefault();
+  utils.copyToClipboard(src.dataset.copy, src);
+});
+
 // A11y: copy icons
 function a11yCopyIcons(root = document) {
   root.querySelectorAll('.copy-icon:not([role])').forEach(el => {
@@ -214,7 +237,7 @@ $('peer-table-body')?.addEventListener('keydown', e => {
     const rows = [...$$('#peer-table-body tr[data-pid]')];
     const idx = rows.indexOf(row);
     const next = e.key === 'ArrowDown' ? rows[idx + 1] : rows[idx - 1];
-    if (next) { next.focus(); peersPanel.selectById(parseInt(next.dataset.pid, 10)); }
+    if (next) { rovingRows.moveTo(next); next.focus(); peersPanel.selectById(parseInt(next.dataset.pid, 10)); }
   }
 });
 
@@ -238,7 +261,7 @@ $('blk-body')?.addEventListener('keydown', e => {
     const rows = [...$$('#blk-body tr[data-bheight]')];
     const idx = rows.indexOf(row);
     const next = e.key === 'ArrowDown' ? rows[idx + 1] : rows[idx - 1];
-    if (next) { next.focus(); blocksPanel.selectByHeight(parseInt(next.dataset.bheight, 10)); }
+    if (next) { rovingRows.moveTo(next); next.focus(); blocksPanel.selectByHeight(parseInt(next.dataset.bheight, 10)); }
   }
 });
 
@@ -302,6 +325,17 @@ setInterval(() => {
 
   const age = Math.floor((Date.now() - lastAt) / 1000);
   const dot = $('live-dot');
+
+  // Data is still arriving while Core is unreachable — it just says so. Age
+  // alone would therefore report a healthy green dot next to an "Unreachable"
+  // badge, so the explicit state wins.
+  if (nodeState.isDown()) {
+    stale.textContent = 'no node';
+    stale.className = 'sb-stale warn';
+    if (dot) dot.className = 'dot err';
+    mobileBar.updateStale(age);
+    return;
+  }
 
   if (age < 30) {
     stale.textContent = '';

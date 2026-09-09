@@ -605,11 +605,21 @@ function rpc(method, params = [], timeoutMs, onRequest) {
   });
 }
 
+// The last transport-level failure, so the client can say *why* the node is
+// unreachable rather than only that it is. Cleared on the next success.
+let _lastRpcError = null;
+
 const safe = (m, p) =>
-  rpc(m, p).catch((e) => {
-    console.error("[warn]", m, e.message);
-    return null;
-  });
+  rpc(m, p)
+    .then((r) => {
+      _lastRpcError = null;
+      return r;
+    })
+    .catch((e) => {
+      console.error("[warn]", m, e.message);
+      _lastRpcError = e.message;
+      return null;
+    });
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // STATE MACHINE
@@ -746,6 +756,10 @@ async function initState() {
   if (!blockchain || typeof blockchain !== "object" || blockchain.blocks == null) {
     _state = {
       error: "getblockchaininfo unavailable",
+      // The underlying cause: "connection refused", "401", "in warmup" and a
+      // timeout are four very different situations for the operator, and the
+      // generic string above cannot tell them apart.
+      errorDetail: _lastRpcError || null,
       blockchain: blockchain || {},
       networkInfo: networkInfo || {},
       mempoolInfo: mempoolInfo || {},

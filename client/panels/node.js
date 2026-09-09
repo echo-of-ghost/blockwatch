@@ -255,7 +255,8 @@ const nodePanel = {
             ? `<span class="tip-hash-pfx">${hash.slice(0, 4)}${hash.slice(4, 8)}…</span><em>${hash.slice(-4)}</em>`
             : "—";
           const copySpan = hash
-            ? `<span data-copy="${esc(hash)}" class="copy-icon">⎘</span>`
+            ? `<span data-copy="${esc(hash)}" class="copy-icon"
+                 role="button" tabindex="0" aria-label="Copy block hash">⎘</span>`
             : "";
           const branchStr =
             t.branchlen > 0
