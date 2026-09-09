@@ -84,8 +84,11 @@ class Cdp {
       nativeVirtualKeyCode: CODES[key] || 0,
       text: key.length === 1 ? key : undefined,
     };
+    // `text` belongs on keyDown only. Sending it on keyUp as well makes the
+    // browser insert the character twice, which every arrow-key test missed
+    // because those carry no text at all.
     await this.send("Input.dispatchKeyEvent", { ...base, type: "keyDown" });
-    await this.send("Input.dispatchKeyEvent", { ...base, type: "keyUp" });
+    await this.send("Input.dispatchKeyEvent", { ...base, type: "keyUp", text: undefined });
   }
 
   // ── synchronisation ──────────────────────────────────────────────────────
