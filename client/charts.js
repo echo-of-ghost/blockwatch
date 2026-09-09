@@ -95,6 +95,15 @@ const charts = {
         setText("mp-min", "—");
         setText("mp-avg", "—");
         setText("mp-max", "—");
+        // Two polls are needed before there is a line to draw. Left empty, the
+        // panel shows an unexplained blank rectangle for the first ten seconds
+        // of every launch, which reads as broken rather than as pending.
+        ctx.fillStyle = getComputedStyle(document.documentElement)
+          .getPropertyValue("--t4").trim() || "#666";
+        ctx.font = '10px "Geist Mono", ui-monospace, monospace';
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("collecting mempool history…", W / 2, H / 2);
         ctx.restore();
         return;
       }
