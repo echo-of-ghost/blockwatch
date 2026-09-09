@@ -77,7 +77,9 @@ const mempoolPanel = {
 
         <div class="bd-section bd-section-chart">
           <div class="bd-section-label">tx backlog · vbytes</div>
-          <canvas id="mp-canvas" style="display:block;width:100%"></canvas>
+          <canvas id="mp-canvas" role="img"
+            aria-label="Mempool size over time. Minimum, average and maximum are given below."
+            style="display:block;width:100%"></canvas>
           <div class="chart-leg" style="margin-top:3px">
             <span class="chart-leg-min" id="mp-min">—</span
             ><span class="chart-leg-avg" id="mp-avg">—</span

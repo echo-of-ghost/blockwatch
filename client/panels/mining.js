@@ -27,9 +27,11 @@ const blocksPanel = {
     const tbody = $("blk-body");
     if (!tbody) return;
 
-    if (ibd && !blocks.length) {
-      tbody.innerHTML =
-        '<tr><td colspan="6" class="ibd-placeholder">block stats unavailable during initial sync</td></tr>';
+    if (!blocks.length) {
+      // colspan matches the five columns actually in the table; it said six.
+      tbody.innerHTML = ibd
+        ? '<tr><td colspan="5" class="ibd-placeholder">block stats unavailable during initial sync</td></tr>'
+        : '<tr><td colspan="5" class="ibd-placeholder">no blocks yet</td></tr>';
       return;
     }
 

@@ -51,9 +51,14 @@ const peersPanel = {
     const tbody = $("peer-table-body");
     if (!tbody) return;
 
-    if (ibd && !peers.length) {
-      tbody.innerHTML =
-        '<tr><td colspan="3" class="ibd-placeholder">peer data unavailable during initial sync</td></tr>';
+    if (!peers.length) {
+      // An empty list is a state worth naming. Outside initial sync this used
+      // to render nothing at all: a grid of column headings over blank space,
+      // which says neither "loading" nor "your node has no peers" — and for a
+      // Bitcoin node, no peers means it is not talking to the network.
+      tbody.innerHTML = ibd
+        ? '<tr><td colspan="3" class="ibd-placeholder">peer data unavailable during initial sync</td></tr>'
+        : '<tr><td colspan="3" class="ibd-placeholder">no peers connected</td></tr>';
       return;
     }
 

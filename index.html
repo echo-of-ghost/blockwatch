@@ -323,6 +323,8 @@
             <div class="bw-chart-wrap">
               <canvas
                 id="spark"
+                role="img"
+                aria-label="Bandwidth over the last 20 minutes. Current rates and session totals are given below."
                 style="display: block; cursor: crosshair"
               ></canvas>
             </div>
@@ -382,7 +384,9 @@
           </div>
           <div class="pb pb-chart" style="position:relative">
             <div id="bt-hover"></div>
-            <canvas id="bt-canvas" style="width: 100%; display: block"></canvas>
+            <canvas id="bt-canvas" role="img"
+              aria-label="Time between each of the most recent blocks. Minimum, average and maximum are given below."
+              style="width: 100%; display: block"></canvas>
             <div class="chart-leg">
               <span class="chart-leg-min" id="bt-min">—</span
               ><span class="chart-leg-avg" id="bt-avg">avg —</span
