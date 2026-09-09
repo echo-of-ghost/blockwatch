@@ -15,6 +15,7 @@ function safeRender(name, fn) {
 
 let _firstRender = true;
 let _staleToastFired = false;
+let _staleToast = null;
 
 function renderAll(d) {
   // Core unreachable: the payload is zero-filled, not measured. Rendering it
@@ -310,11 +311,16 @@ setInterval(() => {
   // Keep the UTXO scan's age honest between scans.
   nodePanel._renderUtxo();
 
-  // Tick tip age elements every second so they stay live between SSE events
+  // Tick every display of "time since the last block" from one source, once a
+  // second. The hero was ticked here while the node panel's copy was only
+  // rewritten when a poll arrived, so the two sat side by side disagreeing by
+  // up to a poll interval — 5m 7s in one panel and 5m 5s in the other, for the
+  // same quantity, at the same instant.
   const _tipTime = poller._lastData?.blocks?.[0]?.time;
   if (_tipTime) {
     const _tipAge = utils.fmtAgeAgo(Date.now() / 1000 - _tipTime);
     setText('ch-tip-age', _tipAge);
+    setText('ni-ta', _tipAge);
     const _heroAge = $('hero-tip-age');
     if (_heroAge) _heroAge.textContent = _tipAge;
   }
@@ -343,7 +349,11 @@ setInterval(() => {
     stale.textContent = '';
     stale.className = 'sb-stale';
     if (dot) dot.className = 'dot ok';
-    _staleToastFired = false;
+    if (_staleToastFired) {
+      _staleToastFired = false;
+      if (_staleToast) { toastStack._dismiss(_staleToast); _staleToast = null; }
+      toastStack.add('Live updates resumed', 'info');
+    }
   } else if (age < 60) {
     stale.textContent = age + 's ago';
     stale.className = 'sb-stale';
@@ -352,9 +362,19 @@ setInterval(() => {
     stale.textContent = Math.floor(age / 60) + 'm ago';
     stale.className = 'sb-stale warn';
     if (dot) dot.className = 'dot err';
-    if (!_staleToastFired) {
+    // What is actually known here is that no update has arrived for a minute,
+    // which could be the node, this server, or the stream between them. The
+    // old copy said "bitcoind unreachable" and blamed the node for all three.
+    // When Core really is refusing, nodeState has already said so precisely,
+    // so this stays quiet rather than saying it worse a second time.
+    if (!_staleToastFired && !nodeState.isDown()) {
       _staleToastFired = true;
-      toastStack.add('bitcoind unreachable', 'warn');
+      _staleToast = toastStack.add(
+        'Live updates have stopped. The last one arrived ' +
+          Math.floor(age / 60) + 'm ago.',
+        'warn',
+        { sticky: true },
+      );
     }
   }
 
